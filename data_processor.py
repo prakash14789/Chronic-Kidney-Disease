@@ -7,60 +7,44 @@ class CKDDataProcessor:
     def __init__(self, data_path="Chronickidneydiseases.csv", random_state=42):
         self.data_path = data_path
         self.random_state = random_state
-        self.categorical_encoders = {}
+        self.le_adherence = LabelEncoder()
         
-    def load_and_clean_data(self, sample_n=5000):
-        """Loads data, removes duplicates, and takes a stratified sample."""
-        df = pd.read_csv(self.data_path)
-        
-        # 1. Remove Duplicates (Requirement #4)
-        initial_count = len(df)
-        df.drop_duplicates(inplace=True)
-        final_count = len(df)
-        if initial_count > final_count:
-            print(f"Removed {initial_count - final_count} duplicate rows.")
-            
-        # 2. Drop identifiers and obvious target proxies (Requirement #1)
-        # GFR, Creatinine, etc., ARE the diagnosis definition.
-        leakage_cols = [
-            "PatientID", "RecommendedVisitsPerMonth", 
-            "GFR", "SerumCreatinine", "BUNLevels", 
-            "ProteinInUrine", "ACR"
-        ]
-        df.drop(columns=leakage_cols, inplace=True, errors="ignore")
-        
-        # 3. Stratified Sampling (for performance)
-        idx, _ = train_test_split(
-            df.index, train_size=min(sample_n, len(df)),
-            stratify=df["Diagnosis"], random_state=self.random_state
-        )
-        return df.loc[idx].reset_index(drop=True)
+    def load_raw_data(self):
+        return pd.read_csv(self.data_path)
     
-    def prepare_train_test(self, df, target="Diagnosis", test_size=0.2):
-        """Splits data and handles encoding correctly (Requirement #2 & #3)."""
+    def get_v3_refined_data(self, df_full, sample_n=5000):
+        """EXACT V3 Data Refining Logic."""
+        # 1. Stratified Sample
+        idx, _ = train_test_split(
+            df_full.index, train_size=sample_n,
+            stratify=df_full["Diagnosis"], random_state=self.random_state
+        )
+        df = df_full.loc[idx].reset_index(drop=True)
+        
+        # 2. Drop identifiers
+        drop_cols = ["PatientID", "RecommendedVisitsPerMonth"]
+        df.drop(columns=drop_cols, inplace=True, errors="ignore")
+        
+        return df
+
+    def split_and_encode_v3(self, df, target="Diagnosis"):
+        """EXACT V3 Encoding and Splitting Logic."""
         X = df.drop(columns=[target])
         y = df[target]
         
-        # 1. Split BEFORE any encoding/scaling
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=self.random_state, stratify=y
+        # Split first
+        X_tr_raw, X_te_raw, y_tr, y_te = train_test_split(
+            X, y, test_size=0.2, random_state=self.random_state, stratify=y
         )
         
-        # 2. Identify and encode categorical columns (Fit on Train, Transform on Test)
-        categorical_cols = X_train.select_dtypes(include=['object']).columns
+        # Fit encoder on TRAIN only
+        le = LabelEncoder()
+        X_tr = X_tr_raw.copy()
+        X_te = X_te_raw.copy()
+        X_tr["Adherence"] = le.fit_transform(X_tr["Adherence"])
         
-        X_train_enc = X_train.copy()
-        X_test_enc = X_test.copy()
+        # Map to test (Handle unseen)
+        adherence_map = {cls: idx for idx, cls in enumerate(le.classes_)}
+        X_te["Adherence"] = X_te["Adherence"].map(lambda x: adherence_map.get(x, -1))
         
-        for col in categorical_cols:
-            le = LabelEncoder()
-            # Fit only on training data
-            X_train_enc[col] = le.fit_transform(X_train[col].astype(str))
-            
-            # Map test data safely (Requirement #3 - Handle unseen categories)
-            test_mapping = {val: i for i, val in enumerate(le.classes_)}
-            X_test_enc[col] = X_test[col].astype(str).map(test_mapping).fillna(-1).astype(int)
-            
-            self.categorical_encoders[col] = le
-            
-        return X_train_enc, X_test_enc, y_train, y_test
+        return X_tr, X_te, y_tr, y_te

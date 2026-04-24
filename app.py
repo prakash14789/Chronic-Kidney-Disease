@@ -6,127 +6,116 @@ from model_trainer import CKDModelTrainer
 from visualizer import CKDVisualizer
 
 # Page Config
-st.set_page_config(page_title="CKD Dual Experiment Pipeline", page_icon="🧬", layout="wide")
+st.set_page_config(page_title="CKD Intelligence Dashboard", page_icon="🧬", layout="wide")
 
 # Custom Styles
 st.markdown("""
     <style>
-    .main { background-color: #ffffff; }
     .stTabs [aria-selected="true"] { background-color: #0d6efd !important; color: white !important; }
-    .metric-card { background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 5px solid #0d6efd; }
+    .metric-card { 
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); 
+        color: white !important; 
+        padding: 20px; 
+        border-radius: 12px; 
+        border-left: 6px solid #3b82f6; 
+        margin-bottom: 20px;
+    }
+    .metric-card h4, .metric-card p { color: white !important; margin: 0; }
+    .section-header { border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-top: 30px; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# Initialize Modules
+# Initialize
 processor = CKDDataProcessor()
 trainer = CKDModelTrainer()
 viz = CKDVisualizer()
 
 # Sidebar
 with st.sidebar:
-    st.title("🧬 Research Pipeline")
+    st.title("🧬 CKD Intelligence")
     st.image("https://cdn-icons-png.flaticon.com/512/3067/3067451.png", width=80)
-    sample_size = st.slider("Select Stratified Sample Size", 1000, 10000, 5000)
+    sample_size = st.slider("Stratified Sample Size", 1000, 10000, 5000)
     st.divider()
-    st.info("This app follows your 'Dual Experiment' logic: Full Features vs Leakage-Free.")
+    st.info("Full Research Pipeline with SHAP Interpretation.")
 
-# ── 1. LOAD & PREPARE DATA ──
+# --- PIPELINE EXECUTION ---
 @st.cache_data
-def load_all_data(sample_n):
-    # Load raw
-    raw_df = processor.load_and_clean_data(sample_n=sample_n)
+def run_full_pipeline(sample_n):
+    df_full = processor.load_raw_data()
+    df_sample = processor.get_v3_refined_data(df_full, sample_n=sample_n)
+    X_tr_f, X_te_f, y_tr_f, y_te_f = processor.split_and_encode_v3(df_sample)
     
-    # Experiment 1: Full Features (including leakage ones for comparison)
-    # We temporarily bypass the removal of leakage features to show the 'Baseline'
-    X_full = raw_df.drop(columns=["Diagnosis"])
-    y_full = raw_df["Diagnosis"]
-    X_tr_f, X_te_f, y_tr_f, y_te_f = processor.prepare_train_test(raw_df)
-    
-    # Experiment 2: Leakage-Free
     leakage_cols = ["GFR", "SerumCreatinine", "BUNLevels", "ProteinInUrine", "ACR"]
-    df_nl = raw_df.drop(columns=leakage_cols, errors="ignore")
-    X_tr_nl, X_te_nl, y_tr_nl, y_te_nl = processor.prepare_train_test(df_nl)
+    X_tr_nl = X_tr_f.drop(columns=leakage_cols, errors="ignore")
+    X_te_nl = X_te_f.drop(columns=leakage_cols, errors="ignore")
     
-    return raw_df, (X_tr_f, X_te_f, y_tr_f, y_te_f), (X_tr_nl, X_te_nl, y_tr_nl, y_te_nl)
+    n_neg, n_pos = (y_tr_f == 0).sum(), (y_tr_f == 1).sum()
+    pipes_nl = trainer.get_v3_pipelines(n_neg, n_pos)
+    res_nl, roc_nl, pr_nl, trained_nl = trainer.run_v3_experiment(X_tr_nl, X_te_nl, y_tr_f, y_te_f, pipelines=pipes_nl)
+    
+    return df_full, df_sample, res_nl, roc_nl, pr_nl, trained_nl, X_te_nl, y_te_f
 
-raw_df, exp_full, exp_nl = load_all_data(sample_size)
-X_tr_f, X_te_f, y_tr_f, y_te_f = exp_full
-X_tr_nl, X_te_nl, y_tr_nl, y_te_nl = exp_nl
+df_full, df_sample, res_nl, roc_nl, pr_nl, trained_nl, X_te_nl, y_te_f = run_full_pipeline(sample_size)
 
-# Main Interface
-st.title("Chronic Kidney Disease (CKD) Classification")
-st.markdown("### Dual Experiment Analysis: Full Features vs Leakage-Free")
+# Main UI
+st.title("CKD Clinical Intelligence Dashboard")
 
-tabs = st.tabs(["📊 Dataset Overview", "🚀 Experiment 1 (Full)", "🛡️ Experiment 2 (Leakage-Free)", "📉 Comparison & Insights"])
+tabs = st.tabs(["📊 Performance Command Center", "🧠 Model Interpretation (SHAP)", "🎯 Threshold Tuning"])
 
-# --- TAB 1: OVERVIEW ---
+# --- TAB 1: COMMAND CENTER ---
 with tabs[0]:
-    st.header("Dataset Overview")
+    st.markdown("<h2 class='section-header'>1. Dataset Overview</h2>", unsafe_allow_html=True)
+    ckd_pct = (df_full['Diagnosis'].mean() * 100)
     col1, col2, col3 = st.columns(3)
-    col1.metric("Sample Size", f"{len(raw_df):,}")
-    col2.metric("CKD Cases", raw_df['Diagnosis'].sum())
-    col3.metric("Non-CKD", len(raw_df) - raw_df['Diagnosis'].sum())
-    
-    st.plotly_chart(viz.plot_class_distribution(raw_df), use_container_width=True)
-    st.dataframe(raw_df.head(10), use_container_width=True)
+    with col1: st.plotly_chart(viz.plot_class_distribution(df_full, ckd_pct), use_container_width=True, key="dist")
+    with col2: st.plotly_chart(viz.plot_misleading_accuracy(ckd_pct), use_container_width=True, key="mis")
+    with col3: st.plotly_chart(viz.plot_age_distribution(df_sample), use_container_width=True, key="age")
 
-# --- TAB 2: EXPERIMENT 1 ---
+    st.markdown("<h2 class='section-header'>2. Model Performance Analysis</h2>", unsafe_allow_html=True)
+    col_a, col_b = st.columns([1, 1])
+    with col_a:
+        st.subheader("Model Comparison (Detailed Metrics)")
+        st.dataframe(res_nl[['Model', 'Balanced Accuracy', 'Macro Precision', 'Macro Recall', 'Macro F1']], use_container_width=True)
+    with col_b:
+        st.plotly_chart(viz.plot_precision_recall_f1(res_nl), use_container_width=True, key="metrics_bar")
+
+    col_c, col_d = st.columns(2)
+    with col_c: st.plotly_chart(viz.plot_roc_curves(roc_nl), use_container_width=True, key="roc")
+    with col_d: st.plotly_chart(viz.plot_pr_curves(pr_nl), use_container_width=True, key="pr")
+
+# --- TAB 2: SHAP INTERPRETATION ---
 with tabs[1]:
-    st.header("Experiment 1: Full Features (Baseline)")
-    st.warning("Note: This experiment includes clinical proxy markers (GFR, etc.) which usually result in near-perfect scores.")
+    st.header("🧠 Model Interpretation with SHAP")
+    best_name = res_nl.iloc[0]["Model"]
+    st.write(f"Analyzing the top model: **{best_name}**")
     
-    with st.spinner("Training models for Experiment 1..."):
-        res_full, roc_full, pipes_full = trainer.run_experiment(X_tr_f, X_te_f, y_tr_f, y_te_f, label="FULL")
+    with st.spinner("Calculating SHAP values (this may take a moment)..."):
+        explainer, shap_values, X_df = trainer.get_shap_explainer(trained_nl[best_name], X_te_nl)
     
-    st.dataframe(res_full.style.highlight_max(axis=0, subset=["Test Accuracy", "ROC-AUC"]), use_container_width=True)
-    st.plotly_chart(viz.plot_roc_curves(roc_full), use_container_width=True)
+    col_s1, col_s2 = st.columns(2)
+    with col_s1:
+        st.subheader("Feature Importance (Global)")
+        st.pyplot(viz.plot_shap_bar(explainer, shap_values, X_df, best_name))
+    with col_s2:
+        st.subheader("Feature Impact (Bee Swarm)")
+        st.pyplot(viz.plot_shap_summary(explainer, shap_values, X_df, best_name))
 
-# --- TAB 3: EXPERIMENT 2 ---
+    st.info("SHAP (SHapley Additive exPlanations) values show how much each feature contributes to the prediction. Red dots indicate high feature values, blue dots indicate low feature values.")
+
+# --- TAB 3: THRESHOLD ---
 with tabs[2]:
-    st.header("Experiment 2: Leakage-Free Features")
-    st.success("Removed clinical markers: GFR, SerumCreatinine, BUNLevels, ProteinInUrine, ACR.")
+    st.header("Decision Threshold Optimization")
+    y_proba = trained_nl[best_name].predict_proba(X_te_nl)[:, 1]
+    th_df, best_th = trainer.tune_threshold(y_te_f, y_proba)
+    st.plotly_chart(viz.plot_threshold_tuning(th_df, best_th), use_container_width=True, key="th")
     
-    with st.spinner("Training models for Experiment 2..."):
-        res_nl, roc_nl, pipes_nl = trainer.run_experiment(X_tr_nl, X_te_nl, y_tr_nl, y_te_nl, label="NO-LEAKAGE")
-    
-    st.dataframe(res_nl.style.highlight_max(axis=0, subset=["Test Accuracy", "ROC-AUC"]), use_container_width=True)
-    st.plotly_chart(viz.plot_roc_curves(roc_nl), use_container_width=True)
-
-# --- TAB 4: COMPARISON ---
-with tabs[3]:
-    st.header("Performance Drop Comparison")
-    
-    best_f = res_full.iloc[0]
-    best_nl = res_nl.iloc[0]
-    
-    acc_drop = best_f["Test Accuracy"] - best_nl["Test Accuracy"]
-    
-    st.markdown(f"""
-    <div class='metric-card'>
-    <h4>Accuracy Inflation from Leakage: <strong>{acc_drop:+.2%}</strong></h4>
-    <p>Removing the clinical markers shows the true predictive power of demographics and lifestyle factors.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Comparison Table (Exact like your code)
-    comp_data = {
-        "Metric": ["Best Model", "Test Accuracy", "Recall", "ROC-AUC"],
-        "Full Features": [best_f["Model"], best_f["Test Accuracy"], best_f["Recall"], best_f["ROC-AUC"]],
-        "No-Leakage": [best_nl["Model"], best_nl["Test Accuracy"], best_nl["Recall"], best_nl["ROC-AUC"]],
-        "Drop": ["-", f"{best_f['Test Accuracy'] - best_nl['Test Accuracy']:+.4f}", 
-                 f"{best_f['Recall'] - best_nl['Recall']:+.4f}", 
-                 f"{best_f['ROC-AUC'] - best_nl['ROC-AUC']:+.4f}"]
-    }
-    st.table(pd.DataFrame(comp_data))
-
-    st.plotly_chart(viz.plot_age_distribution(raw_df), use_container_width=True)
-    
-    st.subheader("Sanity Check")
-    if st.button("Run Sanity Check on Best No-Leakage Model"):
-        acc_shuffled = trainer.run_sanity_check(pipes_nl[best_nl["Model"]], X_te_nl, y_te_nl)
-        st.metric("Shuffled Accuracy", f"{acc_shuffled:.2%}")
-        if acc_shuffled < 0.6:
-            st.success("Pass: Model is learning real patterns, not structural biases.")
+    col_metric, col_sanity = st.columns(2)
+    with col_metric:
+        st.markdown(f"<div class='metric-card'><h4>Optimal Threshold: {best_th}</h4><p>Balanced detection strategy.</p></div>", unsafe_allow_html=True)
+    with col_sanity:
+        if st.button("Run Sanity Check"):
+            acc = trainer.run_sanity_check(trained_nl[best_name], X_te_nl, y_te_f)
+            st.metric("Shuffled Balanced Accuracy", f"{acc:.2%}")
 
 st.markdown("---")
-st.caption("Structured Modular Pipeline using your exact Research Source Code.")
+st.caption("Consolidated Research Dashboard with SHAP and Multi-Metric Analysis.")
