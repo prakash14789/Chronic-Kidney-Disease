@@ -2,7 +2,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 import shap
+import numpy as np
 
 class CKDVisualizer:
     @staticmethod
@@ -31,7 +33,7 @@ class CKDVisualizer:
         for name, data in roc_data.items():
             fig.add_trace(go.Scatter(x=data[0], y=data[1], name=f"{name} (AUC={data[2]:.3f})", mode='lines'))
         fig.add_trace(go.Scatter(x=[0, 1], y=[0, 1], line=dict(dash='dash'), showlegend=False))
-        fig.update_layout(xaxis_title="False Positive Rate", yaxis_title="True Positive Rate", title="ROC Curves (Leakage-Free)")
+        fig.update_layout(xaxis_title="False Positive Rate", yaxis_title="True Positive Rate", title="ROC Curves")
         return fig
 
     @staticmethod
@@ -60,8 +62,6 @@ class CKDVisualizer:
 
     @staticmethod
     def plot_precision_recall_f1(res_df):
-        # We need to ensure these metrics exist in res_df
-        # If not already there, we might need model_trainer to return them
         metrics = ["Macro Precision", "Macro Recall", "Macro F1"]
         fig = px.bar(res_df, x="Model", y=metrics, barmode="group",
                      title="Precision / Recall / F1-Score by Model",
@@ -70,14 +70,33 @@ class CKDVisualizer:
         return fig
 
     @staticmethod
+    def plot_correlation_heatmap(df):
+        plt.figure(figsize=(12, 10))
+        # Select top numeric features to keep heatmap readable
+        numeric_df = df.select_dtypes(include=[np.number])
+        top_cols = numeric_df.var().nlargest(20).index
+        corr = numeric_df[top_cols].corr()
+        mask = np.triu(np.ones_like(corr, dtype=bool))
+        sns.heatmap(corr, mask=mask, annot=True, fmt=".2f", cmap="coolwarm", annot_kws={"size": 7})
+        plt.title("Correlation Heatmap (Top 20 Features)")
+        plt.tight_layout()
+        return plt.gcf()
+
+    @staticmethod
+    def plot_clinical_boxplots(df):
+        clinical = ["GFR", "SerumCreatinine", "BUNLevels", "HbA1c", "ProteinInUrine"]
+        # Use Plotly for interactivity
+        fig = px.box(df, x="Diagnosis", y=[c for c in clinical if c in df.columns],
+                     facet_col="variable", facet_col_wrap=3,
+                     color="Diagnosis", title="Clinical Feature Distributions",
+                     color_discrete_map={0: '#3498DB', 1: '#E74C3C'})
+        fig.update_yaxes(matches=None)
+        return fig
+
+    @staticmethod
     def plot_shap_summary(explainer, shap_values, X_df, model_name):
         plt.figure(figsize=(10, 6))
-        # Handle cases where shap_values might be a list (multiclass or multiclass-like)
-        if isinstance(shap_values, list):
-            sv = shap_values[1]
-        else:
-            sv = shap_values
-        
+        sv = shap_values[1] if isinstance(shap_values, list) else shap_values
         shap.summary_plot(sv, X_df, show=False, plot_type="dot")
         plt.title(f"SHAP Summary — {model_name}")
         plt.tight_layout()
@@ -86,11 +105,7 @@ class CKDVisualizer:
     @staticmethod
     def plot_shap_bar(explainer, shap_values, X_df, model_name):
         plt.figure(figsize=(10, 6))
-        if isinstance(shap_values, list):
-            sv = shap_values[1]
-        else:
-            sv = shap_values
-            
+        sv = shap_values[1] if isinstance(shap_values, list) else shap_values
         shap.summary_plot(sv, X_df, show=False, plot_type="bar")
         plt.title(f"SHAP Feature Importance — {model_name}")
         plt.tight_layout()
@@ -98,14 +113,10 @@ class CKDVisualizer:
 
     @staticmethod
     def plot_local_shap(explainer, shap_values, X_df, patient_idx=0):
-        """Generates a waterfall plot for a single patient."""
         plt.figure(figsize=(10, 5))
-        # Handle different shap value structures
         if hasattr(shap_values, "base_values"):
-            # This is for newer shap version objects
             shap.plots.waterfall(shap_values[patient_idx], show=False)
         else:
-            # Fallback for older array-based shap
             if isinstance(shap_values, list):
                 sv = shap_values[1][patient_idx]
                 base = explainer.expected_value[1]
@@ -113,7 +124,6 @@ class CKDVisualizer:
                 sv = shap_values[patient_idx]
                 base = explainer.expected_value
             shap.plots._waterfall.waterfall_legacy(base, sv, feature_names=X_df.columns, show=False)
-            
-        plt.title("Patient-Specific Risk Factors")
+        plt.title("Individual Risk Factors")
         plt.tight_layout()
         return plt.gcf()
