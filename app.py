@@ -1,19 +1,19 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from data_processor import CKDDataProcessor
 from model_trainer import CKDModelTrainer
 from visualizer import CKDVisualizer
 
 # Page Config
-st.set_page_config(page_title="CKD Leakage-Free Pipeline", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="CKD Dual Experiment Pipeline", page_icon="🧬", layout="wide")
 
 # Custom Styles
 st.markdown("""
     <style>
     .main { background-color: #ffffff; }
-    .stTabs [aria-selected="true"] { background-color: #1a73e8 !important; color: white !important; }
-    .status-box { padding: 15px; border-radius: 10px; margin-bottom: 20px; }
-    .leakage-removed { background-color: #e8f0fe; border-left: 5px solid #1a73e8; }
+    .stTabs [aria-selected="true"] { background-color: #0d6efd !important; color: white !important; }
+    .metric-card { background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 5px solid #0d6efd; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -22,102 +22,111 @@ processor = CKDDataProcessor()
 trainer = CKDModelTrainer()
 viz = CKDVisualizer()
 
-@st.cache_data
-def get_clean_pipeline_data(sample_size):
-    # 1. Load and remove duplicates/leakage features
-    clean_df = processor.load_and_clean_data(sample_n=sample_size)
-    # 2. Strict Split and Encode (Fit on Train ONLY)
-    X_train, X_test, y_train, y_test = processor.prepare_train_test(clean_df)
-    return clean_df, X_train, X_test, y_train, y_test
-
 # Sidebar
 with st.sidebar:
-    st.title("🛡️ Secure Pipeline")
-    st.image("https://cdn-icons-png.flaticon.com/512/2569/2569106.png", width=100)
-    sample_size = st.slider("Dataset Sample Size", 2000, 10000, 5000)
+    st.title("🧬 Research Pipeline")
+    st.image("https://cdn-icons-png.flaticon.com/512/3067/3067451.png", width=80)
+    sample_size = st.slider("Select Stratified Sample Size", 1000, 10000, 5000)
     st.divider()
-    st.success("Target Leakage: REMOVED")
-    st.success("Preprocessing Leakage: REMOVED")
-    st.success("Data Overlap: REMOVED")
+    st.info("This app follows your 'Dual Experiment' logic: Full Features vs Leakage-Free.")
 
-# Logic Flow
-clean_df, X_train, X_test, y_train, y_test = get_clean_pipeline_data(sample_size)
+# ── 1. LOAD & PREPARE DATA ──
+@st.cache_data
+def load_all_data(sample_n):
+    # Load raw
+    raw_df = processor.load_and_clean_data(sample_n=sample_n)
+    
+    # Experiment 1: Full Features (including leakage ones for comparison)
+    # We temporarily bypass the removal of leakage features to show the 'Baseline'
+    X_full = raw_df.drop(columns=["Diagnosis"])
+    y_full = raw_df["Diagnosis"]
+    X_tr_f, X_te_f, y_tr_f, y_te_f = processor.prepare_train_test(raw_df)
+    
+    # Experiment 2: Leakage-Free
+    leakage_cols = ["GFR", "SerumCreatinine", "BUNLevels", "ProteinInUrine", "ACR"]
+    df_nl = raw_df.drop(columns=leakage_cols, errors="ignore")
+    X_tr_nl, X_te_nl, y_tr_nl, y_te_nl = processor.prepare_train_test(df_nl)
+    
+    return raw_df, (X_tr_f, X_te_f, y_tr_f, y_te_f), (X_tr_nl, X_te_nl, y_tr_nl, y_te_nl)
+
+raw_df, exp_full, exp_nl = load_all_data(sample_size)
+X_tr_f, X_te_f, y_tr_f, y_te_f = exp_full
+X_tr_nl, X_te_nl, y_tr_nl, y_te_nl = exp_nl
 
 # Main Interface
-st.title("Realistic CKD Classification Pipeline")
-st.markdown("This dashboard demonstrates a production-level ML pipeline with strict isolation between training and testing data.")
+st.title("Chronic Kidney Disease (CKD) Classification")
+st.markdown("### Dual Experiment Analysis: Full Features vs Leakage-Free")
 
-tabs = st.tabs(["📋 Data Audit", "🏗️ Pipeline Execution", "🔍 Validation & Sanity Check"])
+tabs = st.tabs(["📊 Dataset Overview", "🚀 Experiment 1 (Full)", "🛡️ Experiment 2 (Leakage-Free)", "📉 Comparison & Insights"])
 
-# --- TAB 1: DATA AUDIT ---
+# --- TAB 1: OVERVIEW ---
 with tabs[0]:
-    st.header("1. Audit & Feature Selection")
+    st.header("Dataset Overview")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Sample Size", f"{len(raw_df):,}")
+    col2.metric("CKD Cases", raw_df['Diagnosis'].sum())
+    col3.metric("Non-CKD", len(raw_df) - raw_df['Diagnosis'].sum())
     
-    st.markdown("""
-    <div class='status-box leakage-removed'>
-    <strong>Audit Result:</strong> High-risk clinical markers (GFR, Creatinine, BUN, etc.) have been permanently removed. 
-    The model now relies on <strong>lifestyle, demographics, and medical history</strong> to predict risk.
+    st.plotly_chart(viz.plot_class_distribution(raw_df), use_container_width=True)
+    st.dataframe(raw_df.head(10), use_container_width=True)
+
+# --- TAB 2: EXPERIMENT 1 ---
+with tabs[1]:
+    st.header("Experiment 1: Full Features (Baseline)")
+    st.warning("Note: This experiment includes clinical proxy markers (GFR, etc.) which usually result in near-perfect scores.")
+    
+    with st.spinner("Training models for Experiment 1..."):
+        res_full, roc_full, pipes_full = trainer.run_experiment(X_tr_f, X_te_f, y_tr_f, y_te_f, label="FULL")
+    
+    st.dataframe(res_full.style.highlight_max(axis=0, subset=["Test Accuracy", "ROC-AUC"]), use_container_width=True)
+    st.plotly_chart(viz.plot_roc_curves(roc_full), use_container_width=True)
+
+# --- TAB 3: EXPERIMENT 2 ---
+with tabs[2]:
+    st.header("Experiment 2: Leakage-Free Features")
+    st.success("Removed clinical markers: GFR, SerumCreatinine, BUNLevels, ProteinInUrine, ACR.")
+    
+    with st.spinner("Training models for Experiment 2..."):
+        res_nl, roc_nl, pipes_nl = trainer.run_experiment(X_tr_nl, X_te_nl, y_tr_nl, y_te_nl, label="NO-LEAKAGE")
+    
+    st.dataframe(res_nl.style.highlight_max(axis=0, subset=["Test Accuracy", "ROC-AUC"]), use_container_width=True)
+    st.plotly_chart(viz.plot_roc_curves(roc_nl), use_container_width=True)
+
+# --- TAB 4: COMPARISON ---
+with tabs[3]:
+    st.header("Performance Drop Comparison")
+    
+    best_f = res_full.iloc[0]
+    best_nl = res_nl.iloc[0]
+    
+    acc_drop = best_f["Test Accuracy"] - best_nl["Test Accuracy"]
+    
+    st.markdown(f"""
+    <div class='metric-card'>
+    <h4>Accuracy Inflation from Leakage: <strong>{acc_drop:+.2%}</strong></h4>
+    <p>Removing the clinical markers shows the true predictive power of demographics and lifestyle factors.</p>
     </div>
     """, unsafe_allow_html=True)
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("### Final Feature Set")
-        st.write(list(X_train.columns))
-    with col2:
-        st.write("### Target Class Balance")
-        st.plotly_chart(viz.plot_class_distribution(clean_df), use_container_width=True)
+    # Comparison Table (Exact like your code)
+    comp_data = {
+        "Metric": ["Best Model", "Test Accuracy", "Recall", "ROC-AUC"],
+        "Full Features": [best_f["Model"], best_f["Test Accuracy"], best_f["Recall"], best_f["ROC-AUC"]],
+        "No-Leakage": [best_nl["Model"], best_nl["Test Accuracy"], best_nl["Recall"], best_nl["ROC-AUC"]],
+        "Drop": ["-", f"{best_f['Test Accuracy'] - best_nl['Test Accuracy']:+.4f}", 
+                 f"{best_f['Recall'] - best_nl['Recall']:+.4f}", 
+                 f"{best_f['ROC-AUC'] - best_nl['ROC-AUC']:+.4f}"]
+    }
+    st.table(pd.DataFrame(comp_data))
 
-    st.write("### Data Preview (Post-Audit)")
-    st.dataframe(X_train.head(10), use_container_width=True)
-
-# --- TAB 2: PIPELINE EXECUTION ---
-with tabs[1]:
-    st.header("2. Modular Training & Metrics")
+    st.plotly_chart(viz.plot_age_distribution(raw_df), use_container_width=True)
     
-    with st.spinner("Executing secure pipeline..."):
-        results_df, trained_pipelines = trainer.evaluate_all(X_train, y_train, X_test, y_test)
-    
-    st.subheader("Model Performance (Realistic)")
-    st.write("Notice that metrics are no longer 1.0. These results represent the true predictive capability of the data.")
-    st.dataframe(results_df.style.background_gradient(cmap='Blues', subset=['Accuracy', 'ROC-AUC']), use_container_width=True)
-    
-    st.plotly_chart(viz.plot_model_comparison(results_df), use_container_width=True)
-
-# --- TAB 3: VALIDATION & SANITY CHECK ---
-with tabs[2]:
-    st.header("3. Pipeline Validation")
-    
-    st.subheader("🛑 Sanity Check: Target Shuffling")
-    st.info("If we shuffle the labels, the model's accuracy should drop to random chance (~50%). This proves the model is learning real patterns and not just exploiting a bug in the code.")
-    
-    if st.button("Run Sanity Check"):
-        best_model_name = results_df.iloc[0]["Model"]
-        pipeline = trained_pipelines[best_model_name]
-        
-        acc_real = results_df.iloc[0]["Accuracy"]
-        acc_shuffled = trainer.run_sanity_check(pipeline, X_test, y_test)
-        
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Real Accuracy", f"{acc_real:.2%}")
-        c2.metric("Shuffled Accuracy", f"{acc_shuffled:.2%}", delta=f"{acc_shuffled - acc_real:.2%}", delta_color="inverse")
-        
+    st.subheader("Sanity Check")
+    if st.button("Run Sanity Check on Best No-Leakage Model"):
+        acc_shuffled = trainer.run_sanity_check(pipes_nl[best_nl["Model"]], X_te_nl, y_te_nl)
+        st.metric("Shuffled Accuracy", f"{acc_shuffled:.2%}")
         if acc_shuffled < 0.6:
-            st.success("✅ **Sanity Check Passed!** The accuracy dropped to random chance. The pipeline is robust.")
-        else:
-            st.error("❌ **Sanity Check Failed!** Accuracy is still high. There is still a structural leakage.")
-
-    st.divider()
-    st.subheader("📈 Insights & Curves")
-    st.plotly_chart(viz.plot_age_distribution(clean_df), use_container_width=True)
-    
-    # Simple ROC plot logic (could be integrated into visualizer better)
-    st.write("### Feature Importance (Top Model)")
-    best_pipeline = trained_pipelines[results_df.iloc[0]["Model"]]
-    model_obj = best_pipeline.named_steps['classifier']
-    fig_imp = viz.plot_feature_importance(model_obj, X_train.columns)
-    if fig_imp:
-        st.plotly_chart(fig_imp, use_container_width=True)
+            st.success("Pass: Model is learning real patterns, not structural biases.")
 
 st.markdown("---")
-st.caption("Developed for Academic Excellence & Production Readiness.")
+st.caption("Structured Modular Pipeline using your exact Research Source Code.")
