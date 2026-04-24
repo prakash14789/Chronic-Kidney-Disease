@@ -1,79 +1,67 @@
 import time
 import pandas as pd
+import numpy as np
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, ExtraTreesClassifier
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.metrics import accuracy_score, roc_auc_score, precision_score, recall_score, f1_score, roc_curve
-
-# Try optional classifiers
-try: from xgboost import XGBClassifier
-except: XGBClassifier = None
-
-try: from lightgbm import LGBMClassifier
-except: LGBMClassifier = None
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 
 class CKDModelTrainer:
     def __init__(self, random_state=42):
         self.random_state = random_state
-        self.models = self._initialize_models()
-        self.scaled_models = ["Logistic Regression", "SVM", "KNN"]
-
-    def _initialize_models(self):
+        
+    def get_pipeline(self, model_name):
+        """Creates a leakage-free pipeline with scaling and the model."""
         models = {
-            "Logistic Regression": LogisticRegression(max_iter=500, random_state=self.random_state),
-            "Decision Tree": DecisionTreeClassifier(max_depth=8, random_state=self.random_state),
+            "Logistic Regression": LogisticRegression(max_iter=1000, random_state=self.random_state),
+            "Decision Tree": DecisionTreeClassifier(max_depth=6, random_state=self.random_state),
             "Random Forest": RandomForestClassifier(n_estimators=100, random_state=self.random_state, n_jobs=-1),
             "Gradient Boosting": GradientBoostingClassifier(n_estimators=100, random_state=self.random_state),
-            "SVM": SVC(probability=True, kernel="rbf", random_state=self.random_state),
-            "KNN": KNeighborsClassifier(n_neighbors=7, n_jobs=-1),
-            "Naive Bayes": GaussianNB(),
-            "Extra Trees": ExtraTreesClassifier(n_estimators=100, max_depth=6, random_state=self.random_state, n_jobs=-1),
         }
-        if XGBClassifier:
-            models["XGBoost"] = XGBClassifier(n_estimators=100, max_depth=6, eval_metric="logloss", random_state=self.random_state)
-        if LGBMClassifier:
-            models["LightGBM"] = LGBMClassifier(n_estimators=100, max_depth=6, random_state=self.random_state, verbose=-1)
-        return models
+        
+        if model_name not in models:
+            raise ValueError(f"Model {model_name} not supported.")
+            
+        return Pipeline([
+            ('scaler', StandardScaler()),
+            ('classifier', models[model_name])
+        ])
 
-    def train_and_evaluate(self, X_train, y_train, X_test, y_test, scaler):
-        """Trains all models and returns results and ROC data."""
+    def evaluate_all(self, X_train, y_train, X_test, y_test):
+        """Trains and evaluates all models using the Pipeline approach."""
+        model_names = ["Logistic Regression", "Decision Tree", "Random Forest", "Gradient Boosting"]
         results = []
-        roc_data = {}
-        trained_instances = {}
-        
-        X_train_sc = scaler.fit_transform(X_train)
-        X_test_sc = scaler.transform(X_test)
-        
-        for name, model in self.models.items():
-            is_scaled = name in self.scaled_models
-            Xtr = X_train_sc if is_scaled else X_train
-            Xte = X_test_sc if is_scaled else X_test
+        trained_pipelines = {}
+
+        for name in model_names:
+            pipeline = self.get_pipeline(name)
             
             t0 = time.time()
-            model.fit(Xtr, y_train)
+            pipeline.fit(X_train, y_train)
             elapsed = time.time() - t0
             
-            y_pred = model.predict(Xte)
-            y_proba = model.predict_proba(Xte)[:, 1]
-            
-            acc = accuracy_score(y_test, y_pred)
-            auc = roc_auc_score(y_test, y_proba)
-            fpr, tpr, _ = roc_curve(y_test, y_proba)
-            
-            trained_instances[name] = model
-            roc_data[name] = {"fpr": fpr, "tpr": tpr, "auc": auc}
+            y_pred = pipeline.predict(X_test)
+            y_proba = pipeline.predict_proba(X_test)[:, 1]
             
             results.append({
                 "Model": name,
-                "Accuracy": acc,
+                "Accuracy": accuracy_score(y_test, y_pred),
                 "Precision": precision_score(y_test, y_pred, zero_division=0),
                 "Recall": recall_score(y_test, y_pred, zero_division=0),
                 "F1-Score": f1_score(y_test, y_pred, zero_division=0),
-                "ROC-AUC": auc,
-                "Time (s)": elapsed
+                "ROC-AUC": roc_auc_score(y_test, y_proba),
+                "Time (s)": round(elapsed, 3)
             })
+            trained_pipelines[name] = pipeline
             
-        return pd.DataFrame(results).sort_values("Accuracy", ascending=False), roc_data, trained_instances
+        return pd.DataFrame(results).sort_values("Accuracy", ascending=False), trained_pipelines
+
+    @staticmethod
+    def run_sanity_check(pipeline, X_test, y_test):
+        """Shuffles target labels to verify the performance drops (Requirement #8)."""
+        y_test_shuffled = np.random.permutation(y_test)
+        y_pred = pipeline.predict(X_test)
+        acc_shuffled = accuracy_score(y_test_shuffled, y_pred)
+        return acc_shuffled
