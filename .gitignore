@@ -1,0 +1,9 @@
+venv/
+.env
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*.csv
+model_comparison.csv
+model_comparison_no_leakage.csv
+*.png
