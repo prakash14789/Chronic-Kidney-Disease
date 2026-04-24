@@ -95,3 +95,25 @@ class CKDVisualizer:
         plt.title(f"SHAP Feature Importance — {model_name}")
         plt.tight_layout()
         return plt.gcf()
+
+    @staticmethod
+    def plot_local_shap(explainer, shap_values, X_df, patient_idx=0):
+        """Generates a waterfall plot for a single patient."""
+        plt.figure(figsize=(10, 5))
+        # Handle different shap value structures
+        if hasattr(shap_values, "base_values"):
+            # This is for newer shap version objects
+            shap.plots.waterfall(shap_values[patient_idx], show=False)
+        else:
+            # Fallback for older array-based shap
+            if isinstance(shap_values, list):
+                sv = shap_values[1][patient_idx]
+                base = explainer.expected_value[1]
+            else:
+                sv = shap_values[patient_idx]
+                base = explainer.expected_value
+            shap.plots._waterfall.waterfall_legacy(base, sv, feature_names=X_df.columns, show=False)
+            
+        plt.title("Patient-Specific Risk Factors")
+        plt.tight_layout()
+        return plt.gcf()

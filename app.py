@@ -6,7 +6,7 @@ from model_trainer import CKDModelTrainer
 from visualizer import CKDVisualizer
 
 # Page Config
-st.set_page_config(page_title="CKD Intelligence Dashboard", page_icon="🧬", layout="wide")
+st.set_page_config(page_title="CKD Clinical Intelligence", page_icon="🧬", layout="wide")
 
 # Custom Styles
 st.markdown("""
@@ -21,7 +21,13 @@ st.markdown("""
         margin-bottom: 20px;
     }
     .metric-card h4, .metric-card p { color: white !important; margin: 0; }
-    .section-header { border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-top: 30px; margin-bottom: 20px; }
+    .prediction-box {
+        background-color: #f0f2f6;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        border: 2px solid #0d6efd;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -36,7 +42,7 @@ with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3067/3067451.png", width=80)
     sample_size = st.slider("Stratified Sample Size", 1000, 10000, 5000)
     st.divider()
-    st.info("Full Research Pipeline with SHAP Interpretation.")
+    st.info("Now with Live Patient Diagnosis Tool.")
 
 # --- PIPELINE EXECUTION ---
 @st.cache_data
@@ -58,64 +64,100 @@ def run_full_pipeline(sample_n):
 df_full, df_sample, res_nl, roc_nl, pr_nl, trained_nl, X_te_nl, y_te_f = run_full_pipeline(sample_size)
 
 # Main UI
-st.title("CKD Clinical Intelligence Dashboard")
+tabs = st.tabs(["📊 Performance Dashboard", "🧠 Model Interpretation", "🏥 Patient Diagnosis Tool"])
 
-tabs = st.tabs(["📊 Performance Command Center", "🧠 Model Interpretation (SHAP)", "🎯 Threshold Tuning"])
-
-# --- TAB 1: COMMAND CENTER ---
+# --- TAB 1: DASHBOARD ---
 with tabs[0]:
-    st.markdown("<h2 class='section-header'>1. Dataset Overview</h2>", unsafe_allow_html=True)
+    st.title("CKD Clinical Dashboard")
     ckd_pct = (df_full['Diagnosis'].mean() * 100)
-    col1, col2, col3 = st.columns(3)
-    with col1: st.plotly_chart(viz.plot_class_distribution(df_full, ckd_pct), use_container_width=True, key="dist")
-    with col2: st.plotly_chart(viz.plot_misleading_accuracy(ckd_pct), use_container_width=True, key="mis")
-    with col3: st.plotly_chart(viz.plot_age_distribution(df_sample), use_container_width=True, key="age")
+    c1, c2, c3 = st.columns(3)
+    with c1: st.plotly_chart(viz.plot_class_distribution(df_full, ckd_pct), use_container_width=True, key="dist")
+    with c2: st.plotly_chart(viz.plot_precision_recall_f1(res_nl), use_container_width=True, key="met")
+    with c3: st.plotly_chart(viz.plot_age_distribution(df_sample), use_container_width=True, key="age")
+    st.subheader("Model Rankings")
+    st.dataframe(res_nl[['Model', 'Balanced Accuracy', 'Macro F1', 'ROC-AUC']], use_container_width=True)
 
-    st.markdown("<h2 class='section-header'>2. Model Performance Analysis</h2>", unsafe_allow_html=True)
-    col_a, col_b = st.columns([1, 1])
-    with col_a:
-        st.subheader("Model Comparison (Detailed Metrics)")
-        st.dataframe(res_nl[['Model', 'Balanced Accuracy', 'Macro Precision', 'Macro Recall', 'Macro F1']], use_container_width=True)
-    with col_b:
-        st.plotly_chart(viz.plot_precision_recall_f1(res_nl), use_container_width=True, key="metrics_bar")
-
-    col_c, col_d = st.columns(2)
-    with col_c: st.plotly_chart(viz.plot_roc_curves(roc_nl), use_container_width=True, key="roc")
-    with col_d: st.plotly_chart(viz.plot_pr_curves(pr_nl), use_container_width=True, key="pr")
-
-# --- TAB 2: SHAP INTERPRETATION ---
+# --- TAB 2: SHAP ---
 with tabs[1]:
-    st.header("🧠 Model Interpretation with SHAP")
+    st.header("🧠 Research Interpretation (SHAP)")
     best_name = res_nl.iloc[0]["Model"]
-    st.write(f"Analyzing the top model: **{best_name}**")
-    
-    with st.spinner("Calculating SHAP values (this may take a moment)..."):
+    with st.spinner("Calculating Global SHAP..."):
         explainer, shap_values, X_df = trainer.get_shap_explainer(trained_nl[best_name], X_te_nl)
-    
-    col_s1, col_s2 = st.columns(2)
-    with col_s1:
-        st.subheader("Feature Importance (Global)")
-        st.pyplot(viz.plot_shap_bar(explainer, shap_values, X_df, best_name))
-    with col_s2:
-        st.subheader("Feature Impact (Bee Swarm)")
-        st.pyplot(viz.plot_shap_summary(explainer, shap_values, X_df, best_name))
+    cs1, cs2 = st.columns(2)
+    with cs1: st.pyplot(viz.plot_shap_bar(explainer, shap_values, X_df, best_name))
+    with cs2: st.pyplot(viz.plot_shap_summary(explainer, shap_values, X_df, best_name))
 
-    st.info("SHAP (SHapley Additive exPlanations) values show how much each feature contributes to the prediction. Red dots indicate high feature values, blue dots indicate low feature values.")
-
-# --- TAB 3: THRESHOLD ---
+# --- TAB 3: DIAGNOSIS TOOL ---
 with tabs[2]:
-    st.header("Decision Threshold Optimization")
-    y_proba = trained_nl[best_name].predict_proba(X_te_nl)[:, 1]
-    th_df, best_th = trainer.tune_threshold(y_te_f, y_proba)
-    st.plotly_chart(viz.plot_threshold_tuning(th_df, best_th), use_container_width=True, key="th")
+    st.header("🏥 Individual Patient Diagnosis")
+    st.markdown("Input patient demographics to predict CKD risk and see individual contributing factors.")
     
-    col_metric, col_sanity = st.columns(2)
-    with col_metric:
-        st.markdown(f"<div class='metric-card'><h4>Optimal Threshold: {best_th}</h4><p>Balanced detection strategy.</p></div>", unsafe_allow_html=True)
-    with col_sanity:
-        if st.button("Run Sanity Check"):
-            acc = trainer.run_sanity_check(trained_nl[best_name], X_te_nl, y_te_f)
-            st.metric("Shuffled Balanced Accuracy", f"{acc:.2%}")
+    with st.form("diagnosis_form"):
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            age = st.number_input("Age", 20, 90, 50)
+            gender = st.selectbox("Gender", ["Male", "Female"])
+            bmi = st.number_input("BMI", 15.0, 45.0, 25.0)
+            ethnicity = st.selectbox("Ethnicity", ["Caucasian", "African American", "Asian", "Hispanic"])
+            
+        with col2:
+            smoking = st.selectbox("Smoking Status", ["Non-smoker", "Smoker"])
+            alcohol = st.selectbox("Alcohol Consumption", ["None", "Moderate", "Heavy"])
+            activity = st.number_input("Physical Activity (mins/week)", 0, 300, 150)
+            diet = st.slider("Diet Quality Score", 0, 10, 5)
+            
+        with col3:
+            systolic = st.number_input("Systolic BP", 90, 200, 120)
+            diastolic = st.number_input("Diastolic BP", 60, 120, 80)
+            fbs = st.number_input("Fasting Blood Sugar", 70, 200, 100)
+            adherence = st.selectbox("Medication Adherence", ["Low", "Moderate", "High"])
+
+        submit = st.form_submit_button("🩺 Run Diagnosis")
+
+    if submit:
+        # Prepare Input Data
+        input_data = pd.DataFrame([{
+            "Age": age, "Gender": 1 if gender == "Male" else 0, "BMI": bmi,
+            "Ethnicity": 0, # Simplified for demo
+            "SocioeconomicStatus": 1, "EducationLevel": 1,
+            "Smoking": 1 if smoking == "Smoker" else 0,
+            "AlcoholConsumption": 1 if alcohol != "None" else 0,
+            "PhysicalActivity": activity, "DietQuality": diet, "SleepQuality": 7,
+            "FamilyHistoryKidneyDisease": 0, "FamilyHistoryHypertension": 0, "FamilyHistoryDiabetes": 0,
+            "PreviousAcuteKidneyInjury": 0, "UrinaryTractInfections": 0,
+            "SystolicBP": systolic, "DiastolicBP": diastolic, "FastingBloodSugar": fbs, "HbA1c": 5.5,
+            "SerumElectrolytesSodium": 140, "SerumElectrolytesPotassium": 4.0, 
+            "SerumElectrolytesCalcium": 9.5, "SerumElectrolytesPhosphorus": 3.5,
+            "HemoglobinLevels": 14.0, "CholesterolTotal": 200, "CholesterolLDL": 100, 
+            "CholesterolHDL": 50, "CholesterolTriglycerides": 150,
+            "ACEInhibitors": 0, "Diuretics": 0, "NSAIDsUse": 0, "Statins": 0,
+            "AntidiabeticMedications": 0, "Edema": 0, "FatigueLevels": 0, "NauseaVomiting": 0,
+            "MuscleCramps": 0, "Itching": 0, "QualityOfLifeScore": 80, "HeavyMetalsExposure": 0,
+            "OccupationalExposureChemicals": 0, "WaterQuality": 1, "MedicalCheckupsFrequency": 2,
+            "MedicationAdherence": 1 if adherence != "Low" else 0, "HealthLiteracy": 2,
+            "Adherence": 1 if adherence == "High" else (0 if adherence == "Moderate" else -1)
+        }])
+        
+        # Ensure all columns are present (even those dropped in nl)
+        # We need the full set of columns that X_tr_nl had
+        final_input = input_data[X_te_nl.columns]
+        
+        best_pipe = trained_nl[res_nl.iloc[0]["Model"]]
+        prob = best_pipe.predict_proba(final_input)[0, 1]
+        prediction = "CKD Likely" if prob > 0.5 else "Low Risk"
+        
+        st.markdown(f"""
+        <div class='prediction-box'>
+        <h3>Diagnosis: <span style='color: {"#E74C3C" if prob > 0.5 else "#27AE60"}'>{prediction}</span></h3>
+        <h1>Risk Score: {prob:.1%}</h1>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.subheader("Why this prediction?")
+        # Calculate Local SHAP
+        explainer_local, shap_vals_local, X_df_local = trainer.get_shap_explainer(best_pipe, final_input)
+        st.pyplot(viz.plot_local_shap(explainer_local, shap_vals_local, X_df_local, patient_idx=0))
 
 st.markdown("---")
-st.caption("Consolidated Research Dashboard with SHAP and Multi-Metric Analysis.")
+st.caption("Clinical Intelligence System v3.1 — Professional Patient Diagnosis Interface.")
