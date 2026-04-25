@@ -150,48 +150,49 @@ class CKDVisualizer:
         return CKDVisualizer._apply_dark_theme(fig)
 
     @staticmethod
-    def plot_shap_summary(explainer, shap_values, X_df, model_name):
-        plt.style.use('dark_background')
+    def _fix_matplotlib_colors(fig):
         plt.rcParams.update({
             'text.color': COLORS["text"],
             'axes.labelcolor': COLORS["text"],
             'xtick.color': COLORS["text"],
-            'ytick.color': COLORS["text"]
+            'ytick.color': COLORS["text"],
+            'axes.edgecolor': COLORS["grid"]
         })
+        for ax in fig.get_axes():
+            ax.set_facecolor(COLORS["bg"])
+            ax.tick_params(axis='both', which='both', colors=COLORS["text"], labelsize=10)
+            ax.xaxis.label.set_color(COLORS["text"])
+            ax.yaxis.label.set_color(COLORS["text"])
+            ax.title.set_color(COLORS["text"])
+            # Fix for SHAP specifically: find all text objects
+            for text in ax.get_children():
+                if isinstance(text, plt.Text):
+                    text.set_color(COLORS["text"])
+        return fig
+
+    @staticmethod
+    def plot_shap_summary(explainer, shap_values, X_df, model_name):
+        plt.style.use('dark_background')
         fig = plt.figure(figsize=(10, 6))
         fig.patch.set_facecolor(COLORS["bg"])
         sv = shap_values[1] if isinstance(shap_values, list) else shap_values
         shap.summary_plot(sv, X_df, show=False, plot_type="dot")
-        plt.title(f"SHAP Summary — {model_name}", color=COLORS["text"], pad=20)
-        plt.tight_layout()
-        return fig
+        plt.title(f"SHAP Summary — {model_name}", color=COLORS["text"], pad=25, fontsize=14)
+        return CKDVisualizer._fix_matplotlib_colors(fig)
 
     @staticmethod
     def plot_shap_bar(explainer, shap_values, X_df, model_name):
         plt.style.use('dark_background')
-        plt.rcParams.update({
-            'text.color': COLORS["text"],
-            'axes.labelcolor': COLORS["text"],
-            'xtick.color': COLORS["text"],
-            'ytick.color': COLORS["text"]
-        })
         fig = plt.figure(figsize=(10, 6))
         fig.patch.set_facecolor(COLORS["bg"])
         sv = shap_values[1] if isinstance(shap_values, list) else shap_values
         shap.summary_plot(sv, X_df, show=False, plot_type="bar")
-        plt.title(f"SHAP Feature Importance — {model_name}", color=COLORS["text"], pad=20)
-        plt.tight_layout()
-        return fig
+        plt.title(f"SHAP Feature Importance — {model_name}", color=COLORS["text"], pad=25, fontsize=14)
+        return CKDVisualizer._fix_matplotlib_colors(fig)
 
     @staticmethod
     def plot_local_shap(explainer, shap_values, X_df, patient_idx=0):
         plt.style.use('dark_background')
-        plt.rcParams.update({
-            'text.color': COLORS["text"],
-            'axes.labelcolor': COLORS["text"],
-            'xtick.color': COLORS["text"],
-            'ytick.color': COLORS["text"]
-        })
         fig = plt.figure(figsize=(10, 5))
         fig.patch.set_facecolor(COLORS["bg"])
         if hasattr(shap_values, "base_values"):
@@ -204,6 +205,5 @@ class CKDVisualizer:
                 sv = shap_values[patient_idx]
                 base = explainer.expected_value
             shap.plots._waterfall.waterfall_legacy(base, sv, feature_names=X_df.columns, show=False)
-        plt.title("Individual Risk Factors", color=COLORS["text"], pad=20)
-        plt.tight_layout()
-        return fig
+        plt.title("Individual Risk Factors", color=COLORS["text"], pad=25, fontsize=14)
+        return CKDVisualizer._fix_matplotlib_colors(fig)
