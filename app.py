@@ -3,31 +3,34 @@ import pandas as pd
 import numpy as np
 from data_processor import CKDDataProcessor
 from model_trainer import CKDModelTrainer
-from visualizer import CKDVisualizer
+from visualizer import CKDVisualizer, COLORS
 
 # Page Config
 st.set_page_config(page_title="CKD Clinical Intelligence v3.2", page_icon="🧬", layout="wide")
 
 # Custom Styles
-st.markdown("""
+st.markdown(f"""
     <style>
-    .stTabs [aria-selected="true"] { background-color: #0d6efd !important; color: white !important; }
-    .metric-card { 
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); 
-        color: white !important; 
+    .stApp {{ background-color: {COLORS["bg"]}; color: {COLORS["text"]}; }}
+    .stTabs [aria-selected="true"] {{ background-color: {COLORS["primary"]} !important; color: white !important; }}
+    .metric-card {{ 
+        background: linear-gradient(135deg, #1e293b 0%, {COLORS["bg"]} 100%); 
+        color: {COLORS["text"]} !important; 
         padding: 20px; 
         border-radius: 12px; 
-        border-left: 6px solid #3b82f6; 
+        border-left: 6px solid {COLORS["primary"]}; 
         margin-bottom: 20px;
-    }
-    .metric-card h4, .metric-card p { color: white !important; margin: 0; }
-    .prediction-box {
-        background-color: #f0f2f6;
+        border: 1px solid {COLORS["grid"]};
+    }}
+    .metric-card h4, .metric-card p {{ color: {COLORS["text"]} !important; margin: 0; }}
+    .prediction-box {{
+        background-color: {COLORS["grid"]};
         padding: 20px;
         border-radius: 10px;
         text-align: center;
-        border: 2px solid #0d6efd;
-    }
+        border: 2px solid {COLORS["primary"]};
+        color: {COLORS["text"]};
+    }}
     </style>
     """, unsafe_allow_html=True)
 
