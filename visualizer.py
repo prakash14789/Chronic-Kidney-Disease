@@ -68,7 +68,8 @@ class CKDVisualizer:
     @staticmethod
     def plot_roc_curves(roc_data):
         fig = go.Figure()
-        colors = [COLORS["primary"], COLORS["secondary"], COLORS["accent"]]
+        colors = ["#4CC9F0", "#F72585", "#4361EE", "#B8F2E6", "#7209B7", 
+                  "#FF9F1C", "#FF6B6B", "#E9FF70", "#B5179E", "#4895EF"]
         for i, (name, data) in enumerate(roc_data.items()):
             color = colors[i % len(colors)]
             fig.add_trace(go.Scatter(x=data[0], y=data[1], name=f"{name} (AUC={data[2]:.3f})", 
@@ -80,7 +81,8 @@ class CKDVisualizer:
     @staticmethod
     def plot_pr_curves(pr_data):
         fig = go.Figure()
-        colors = [COLORS["primary"], COLORS["secondary"], COLORS["accent"]]
+        colors = ["#4CC9F0", "#F72585", "#4361EE", "#B8F2E6", "#7209B7", 
+                  "#FF9F1C", "#FF6B6B", "#E9FF70", "#B5179E", "#4895EF"]
         for i, (name, data) in enumerate(pr_data.items()):
             color = colors[i % len(colors)]
             fig.add_trace(go.Scatter(x=data[1], y=data[0], name=f"{name} (AvgPrec={data[2]:.3f})", 
@@ -102,8 +104,16 @@ class CKDVisualizer:
     @staticmethod
     def plot_age_distribution(df):
         fig = px.histogram(df, x="Age", color="Diagnosis", barmode="overlay",
+                           histnorm="percent", opacity=0.6,
                            color_discrete_map={0: COLORS["non_ckd"], 1: COLORS["ckd"]},
-                           marginal="box", title="Age Distribution by CKD Status")
+                           marginal="box", title="Age Distribution by CKD Status (Normalized)")
+        
+        fig.update_layout(
+            yaxis_title="Percent of Class",
+            xaxis_title="Patient Age",
+            legend_title="Diagnosis",
+            bargap=0.05
+        )
         return CKDVisualizer._apply_dark_theme(fig)
 
     @staticmethod

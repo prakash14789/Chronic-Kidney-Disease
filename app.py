@@ -68,9 +68,14 @@ def run_full_pipeline(sample_n):
     pipes_nl = trainer.get_v3_pipelines(n_neg, n_pos)
     res_nl, roc_nl, pr_nl, trained_nl = trainer.run_v3_experiment(X_tr_nl, X_te_nl, y_tr_f, y_te_f, pipelines=pipes_nl)
     
-    return df_full, df_sample, res_f, roc_f, res_nl, roc_nl, pr_nl, trained_nl, X_te_nl, y_te_f
+    # Calculate Optimal Threshold for Best Model
+    best_name = res_nl.iloc[0]["Model"]
+    y_proba = trained_nl[best_name].predict_proba(X_te_nl)[:, 1]
+    _, best_th = trainer.tune_threshold(y_te_f, y_proba)
+    
+    return df_full, df_sample, res_f, roc_f, res_nl, roc_nl, pr_nl, trained_nl, X_te_nl, y_te_f, best_th
 
-df_full, df_sample, res_f, roc_f, res_nl, roc_nl, pr_nl, trained_nl, X_te_nl, y_te_f = run_full_pipeline(sample_size)
+df_full, df_sample, res_f, roc_f, res_nl, roc_nl, pr_nl, trained_nl, X_te_nl, y_te_f, best_th = run_full_pipeline(sample_size)
 
 # Main UI
 st.title("CKD Clinical Intelligence Dashboard")
@@ -136,7 +141,7 @@ with tabs[4]:
     st.header("Decision Threshold Optimization")
     best_name = res_nl.iloc[0]["Model"]
     y_proba = trained_nl[best_name].predict_proba(X_te_nl)[:, 1]
-    th_df, best_th = trainer.tune_threshold(y_te_f, y_proba)
+    th_df, _ = trainer.tune_threshold(y_te_f, y_proba) # Use pre-calculated best_th
     st.plotly_chart(viz.plot_threshold_tuning(th_df, best_th), use_container_width=True, key="th_tune")
     if st.button("Run Sanity Check"):
         acc = trainer.run_sanity_check(trained_nl[best_name], X_te_nl, y_te_f)
@@ -153,36 +158,130 @@ with tabs[5]:
 
 # --- TAB 7: DIAGNOSIS ---
 with tabs[6]:
-    st.header("🏥 Individual Patient Diagnosis")
+    st.header("🏥 Precision Patient Diagnosis")
+    st.info("Fill in the clinical details below. Features not specified will be set to the population average (mean) for the research model.")
+    
     with st.form("diag_form"):
-        c1, c2, c3 = st.columns(3)
-        with c1:
+        # Section 1: Demographics & Lifestyle
+        st.subheader("1. Patient Profile & Lifestyle")
+        cl1, cl2, cl3, cl4 = st.columns(4)
+        with cl1:
             age = st.number_input("Age", 20, 90, 50)
             gender = st.selectbox("Gender", ["Male", "Female"])
+        with cl2:
             bmi = st.number_input("BMI", 15.0, 45.0, 25.0)
-        with c2:
             smoking = st.selectbox("Smoking", ["No", "Yes"])
-            activity = st.number_input("Activity", 0, 300, 150)
-            systolic = st.number_input("Systolic BP", 90, 200, 120)
-        with c3:
-            fbs = st.number_input("Fasting Blood Sugar", 70, 200, 100)
-            adherence = st.selectbox("Adherence", ["High", "Moderate", "Low"])
+        with cl3:
+            activity = st.number_input("Activity (min/week)", 0, 300, 150)
+            adherence = st.selectbox("Medication Adherence", ["Adherent", "Non-Adherent"])
+        with cl4:
+            diet = st.slider("Diet Quality (0-10)", 0, 10, 5)
+            sleep = st.slider("Sleep Quality (0-10)", 0, 10, 7)
+
+        st.divider()
         
-        sub = st.form_submit_button("🩺 Diagnose")
+        # Section 2: Core Clinical Vitals
+        st.subheader("2. Primary Clinical Markers")
+        cv1, cv2, cv3, cv4 = st.columns(4)
+        with cv1:
+            systolic = st.number_input("Systolic BP (mmHg)", 90, 200, 120)
+            diastolic = st.number_input("Diastolic BP (mmHg)", 60, 130, 80)
+        with cv2:
+            fbs = st.number_input("Fasting Blood Sugar", 70, 250, 100)
+            hba1c = st.number_input("HbA1c (%)", 4.0, 15.0, 5.5)
+        with cv3:
+            hemoglobin = st.number_input("Hemoglobin (g/dL)", 10.0, 20.0, 14.0)
+            cholesterol = st.number_input("Total Cholesterol", 100, 400, 180)
+        with cv4:
+            st.write("Family History")
+            fam_kidney = st.checkbox("Kidney Disease", value=False)
+            fam_hyper = st.checkbox("Hypertension", value=False)
+            fam_diab = st.checkbox("Diabetes", value=False)
+
+        # Section 3: Advanced Parameters (Optional)
+        with st.expander("🛠️ Advanced Parameters (Optional - Defaults to Population Mean)"):
+            st.write("Adjust these for a more precise clinical profile.")
+            ca1, ca2, ca3 = st.columns(3)
+            with ca1:
+                sodium = st.number_input("Serum Sodium (mEq/L)", 130.0, 150.0, float(X_te_nl["SerumElectrolytesSodium"].mean()))
+                potassium = st.number_input("Serum Potassium (mEq/L)", 3.0, 6.0, float(X_te_nl["SerumElectrolytesPotassium"].mean()))
+            with ca2:
+                fatigue = st.slider("Fatigue Level (0-10)", 0, 10, int(X_te_nl["FatigueLevels"].mean()))
+                edema = st.selectbox("Edema (Swelling)", ["No", "Yes"], index=int(X_te_nl["Edema"].mean()))
+            with ca3:
+                qol = st.slider("Quality of Life Score", 0, 100, int(X_te_nl["QualityOfLifeScore"].mean()))
+                heavy_metals = st.checkbox("Heavy Metals Exposure", value=bool(X_te_nl["HeavyMetalsExposure"].mean() > 0.5))
+
+        sub = st.form_submit_button("🚀 Generate Precision Diagnosis")
         
     if sub:
-        input_row = pd.DataFrame(0, index=[0], columns=X_te_nl.columns)
+        # 1. Use mean values as baseline for ALL features
+        input_row = X_te_nl.mean().to_frame().T.copy()
+        
+        # 2. Overwrite with user input (mapping names to CSV columns)
         input_row["Age"] = age
         input_row["BMI"] = bmi
         input_row["SystolicBP"] = systolic
+        input_row["DiastolicBP"] = diastolic
         input_row["FastingBloodSugar"] = fbs
+        input_row["HbA1c"] = hba1c
         input_row["PhysicalActivity"] = activity
-        if "Gender" in input_row.columns: input_row["Gender"] = 1 if gender == "Male" else 0
-        if "Smoking" in input_row.columns: input_row["Smoking"] = 1 if smoking == "Yes" else 0
+        input_row["DietQuality"] = diet
+        input_row["SleepQuality"] = sleep
+        input_row["HemoglobinLevels"] = hemoglobin
+        input_row["CholesterolTotal"] = cholesterol
+        input_row["SerumElectrolytesSodium"] = sodium
+        input_row["SerumElectrolytesPotassium"] = potassium
+        input_row["FatigueLevels"] = fatigue
+        input_row["QualityOfLifeScore"] = qol
         
+        # Binary / Categorical Mappings
+        input_row["Gender"] = 1 if gender == "Male" else 0
+        input_row["Smoking"] = 1 if smoking == "Yes" else 0
+        input_row["FamilyHistoryKidneyDisease"] = 1 if fam_kidney else 0
+        input_row["FamilyHistoryHypertension"] = 1 if fam_hyper else 0
+        input_row["FamilyHistoryDiabetes"] = 1 if fam_diab else 0
+        input_row["Edema"] = 1 if edema == "Yes" else 0
+        input_row["HeavyMetalsExposure"] = 1 if heavy_metals else 0
+        
+        # Adherence mapping (based on training LabelEncoder: Adherent=0, Non-Adherent=1)
+        input_row["Adherence"] = 0 if adherence == "Adherent" else 1
+
+        # 4. Ensure exact column order and alignment
+        input_row = input_row[X_te_nl.columns]
+        
+        # 5. Prediction
         prob = trained_nl[best_name].predict_proba(input_row)[0, 1]
-        st.markdown(f"<div class='prediction-box'><h3>Risk Score: {prob:.1%}</h3></div>", unsafe_allow_html=True)
+        assessment = trainer.get_clinical_assessment(prob)
+        
+        # Display Results
+        col_res1, col_res2 = st.columns([1, 2])
+        with col_res1:
+            st.markdown(f"""
+                <div class='prediction-box'>
+                    <p style='color: {COLORS["text"]}; margin-bottom: 5px;'>Predicted Risk Probability</p>
+                    <h2 style='color: {assessment["Color"]};'>{prob:.1%}</h2>
+                    <hr style='border: 1px solid {COLORS["grid"]};'>
+                    <p style='font-size: 1.2rem; font-weight: bold; color: {assessment["Color"]};'>
+                        {assessment["Icon"]} {assessment["Level"]}
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        with col_res2:
+            st.markdown(f"""
+                <div class='metric-card' style='border-left: 6px solid {assessment["Color"]};'>
+                    <h4>Clinical Recommendation</h4>
+                    <p style='font-size: 1.1rem; margin-top: 10px;'>{assessment["Action"]}</p>
+                    <p style='font-size: 0.9rem; color: #94a3b8; margin-top: 15px;'>
+                        *Decision based on optimal clinical threshold of <strong>{best_th}</strong>
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        st.markdown("### Feature Contribution Analysis")
+        st.info("The chart below shows which features pushed the risk up (Red) or down (Blue) for THIS specific patient.")
         st.pyplot(viz.plot_local_shap(explainer, shap_values, X_df, patient_idx=0))
 
 st.markdown("---")
-st.caption("CKD Intelligence v3.2 — All v3 Research Insights Included.")
+st.caption("CKD Intelligence v3.2 — Precision Research Dashboard.")

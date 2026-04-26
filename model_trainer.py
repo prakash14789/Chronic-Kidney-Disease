@@ -142,6 +142,30 @@ class CKDModelTrainer:
         best_th = df.loc[df["Macro F1"].idxmax(), "Threshold"]
         return df, best_th
 
+    def get_clinical_assessment(self, probability):
+        """Risk Stratification and Clinical Recommendations."""
+        if probability < 0.3:
+            return {
+                "Level": "Low Risk",
+                "Color": "#4D96FF",  # Blue
+                "Action": "Routine monitoring recommended. Maintain healthy lifestyle habits.",
+                "Icon": "✅"
+            }
+        elif probability < 0.7:
+            return {
+                "Level": "Moderate Risk",
+                "Color": "#FFD93D",  # Yellow
+                "Action": "Further diagnostic tests advised. Schedule a follow-up consultation.",
+                "Icon": "⚠️"
+            }
+        else:
+            return {
+                "Level": "High Risk",
+                "Color": "#FF6B6B",  # Red
+                "Action": "Immediate medical attention required. Urgent nephrologist referral suggested.",
+                "Icon": "🚨"
+            }
+
     def get_shap_explainer(self, model, X_test):
         """Generates SHAP values for the best model."""
         import shap
