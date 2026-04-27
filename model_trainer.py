@@ -15,6 +15,7 @@ from sklearn.metrics import (
     roc_curve, precision_score, recall_score, cohen_kappa_score, 
     average_precision_score, precision_recall_curve
 )
+from sklearn.calibration import CalibratedClassifierCV
 
 # Imblearn for leakage-free SMOTE
 try:
@@ -85,15 +86,20 @@ class CKDModelTrainer:
             try:
                 cv_scores = cross_val_score(pipe, X_tr, y_tr, cv=cv, scoring="balanced_accuracy", n_jobs=-1)
                 pipe.fit(X_tr, y_tr)
-                y_pred = pipe.predict(X_te)
-                y_proba = pipe.predict_proba(X_te)[:, 1]
+                
+                # --- CALIBRATION STEP (Platt Scaling) ---
+                calibrated_model = CalibratedClassifierCV(pipe, method="sigmoid", cv=3)
+                calibrated_model.fit(X_tr, y_tr)
+                
+                y_pred = calibrated_model.predict(X_te)
+                y_proba = calibrated_model.predict_proba(X_te)[:, 1]
                 
                 auc = roc_auc_score(y_te, y_proba)
                 fpr, tpr, _ = roc_curve(y_te, y_proba)
                 roc_data[name] = (fpr, tpr, auc)
                 precision, recall, _ = precision_recall_curve(y_te, y_proba)
                 pr_data[name] = (precision, recall, average_precision_score(y_te, y_proba))
-                trained[name] = pipe
+                trained[name] = {"calibrated": calibrated_model, "raw_pipe": pipe}
 
                 results.append({
                     "Model": name,
@@ -142,16 +148,16 @@ class CKDModelTrainer:
         best_th = df.loc[df["Macro F1"].idxmax(), "Threshold"]
         return df, best_th
 
-    def get_clinical_assessment(self, probability):
-        """Risk Stratification and Clinical Recommendations."""
-        if probability < 0.3:
+    def get_clinical_assessment(self, probability, threshold):
+        """Risk Stratification aligned with optimal clinical threshold."""
+        if probability < threshold:
             return {
                 "Level": "Low Risk",
                 "Color": "#4D96FF",  # Blue
                 "Action": "Routine monitoring recommended. Maintain healthy lifestyle habits.",
                 "Icon": "✅"
             }
-        elif probability < 0.7:
+        elif probability < threshold + 0.3: # Moderate risk range
             return {
                 "Level": "Moderate Risk",
                 "Color": "#FFD93D",  # Yellow
@@ -166,24 +172,35 @@ class CKDModelTrainer:
                 "Icon": "🚨"
             }
 
-    def get_shap_explainer(self, model, X_test):
-        """Generates SHAP values for the best model."""
+    def get_shap_explainer(self, model_entry, X_input):
+        """Robust SHAP explainer for pipeline-wrapped models."""
         import shap
-        # Extract clf and transform X if needed
-        clf = model.named_steps['clf']
-        if 'scaler' in model.named_steps:
-            X_trans = model.named_steps['scaler'].transform(X_test)
+        import pandas as pd
+
+        # ✅ Extract raw pipeline from dict
+        inner_pipe = model_entry["raw_pipe"]
+
+        clf = inner_pipe.named_steps["clf"]
+
+        # Apply scaling if present
+        if "scaler" in inner_pipe.named_steps:
+            X_trans = inner_pipe.named_steps["scaler"].transform(X_input)
         else:
-            X_trans = X_test.values
-            
-        X_df = pd.DataFrame(X_trans, columns=X_test.columns)
-        
-        try:
+            X_trans = X_input.values if hasattr(X_input, 'values') else X_input
+
+        X_df = pd.DataFrame(X_trans, columns=X_input.columns)
+
+        # ✅ Tree model → TreeExplainer (fast + correct)
+        if hasattr(clf, "feature_importances_"):
             explainer = shap.TreeExplainer(clf)
             shap_values = explainer.shap_values(X_df)
-            return explainer, shap_values, X_df
-        except:
-            # Fallback to KernelExplainer if TreeExplainer fails
-            explainer = shap.Explainer(clf, X_df)
-            shap_values = explainer(X_df)
-            return explainer, shap_values, X_df
+
+            # Classification → take class 1 (CKD positive)
+            if isinstance(shap_values, list):
+                shap_values = shap_values[1]
+        else:
+            # Fallback for non-tree models (SVM, KNN, Logistic, etc.)
+            explainer = shap.Explainer(clf.predict_proba, X_df)
+            shap_values = explainer(X_df).values
+
+        return explainer, shap_values, X_df

@@ -70,12 +70,15 @@ def run_full_pipeline(sample_n):
     
     # Calculate Optimal Threshold for Best Model
     best_name = res_nl.iloc[0]["Model"]
-    y_proba = trained_nl[best_name].predict_proba(X_te_nl)[:, 1]
+    y_proba = trained_nl[best_name]["calibrated"].predict_proba(X_te_nl)[:, 1]
     _, best_th = trainer.tune_threshold(y_te_f, y_proba)
     
-    return df_full, df_sample, res_f, roc_f, res_nl, roc_nl, pr_nl, trained_nl, X_te_nl, y_te_f, best_th
+    # Audit: Print Adherence Mapping for verification
+    print(f"DEBUG: Adherence Classes: {processor.le_adherence.classes_}")
+    
+    return processor, df_full, df_sample, res_f, roc_f, res_nl, roc_nl, pr_nl, trained_nl, X_te_nl, y_te_f, best_th
 
-df_full, df_sample, res_f, roc_f, res_nl, roc_nl, pr_nl, trained_nl, X_te_nl, y_te_f, best_th = run_full_pipeline(sample_size)
+processor, df_full, df_sample, res_f, roc_f, res_nl, roc_nl, pr_nl, trained_nl, X_te_nl, y_te_f, best_th = run_full_pipeline(sample_size)
 
 # Main UI
 st.title("CKD Clinical Intelligence Dashboard")
@@ -140,26 +143,33 @@ with tabs[3]:
 with tabs[4]:
     st.header("Decision Threshold Optimization")
     best_name = res_nl.iloc[0]["Model"]
-    y_proba = trained_nl[best_name].predict_proba(X_te_nl)[:, 1]
+    y_proba = trained_nl[best_name]["calibrated"].predict_proba(X_te_nl)[:, 1]
     th_df, _ = trainer.tune_threshold(y_te_f, y_proba) # Use pre-calculated best_th
     st.plotly_chart(viz.plot_threshold_tuning(th_df, best_th), use_container_width=True, key="th_tune")
     if st.button("Run Sanity Check"):
-        acc = trainer.run_sanity_check(trained_nl[best_name], X_te_nl, y_te_f)
+        acc = trainer.run_sanity_check(trained_nl[best_name]["calibrated"], X_te_nl, y_te_f)
         st.metric("Shuffled Balanced Accuracy", f"{acc:.2%}")
 
 # --- TAB 6: SHAP ---
 with tabs[5]:
     st.header("🧠 Model Interpretation (SHAP)")
-    with st.spinner("Calculating Global SHAP..."):
-        explainer, shap_values, X_df = trainer.get_shap_explainer(trained_nl[best_name], X_te_nl)
-    cs1, cs2 = st.columns(2)
-    with cs1: st.pyplot(viz.plot_shap_bar(explainer, shap_values, X_df, best_name))
-    with cs2: st.pyplot(viz.plot_shap_summary(explainer, shap_values, X_df, best_name))
+    try:
+        with st.spinner("Calculating Global SHAP..."):
+            explainer, shap_values, X_df = trainer.get_shap_explainer(trained_nl[best_name], X_te_nl)
+        st.write(f"✅ SHAP values type: `{type(shap_values).__name__}` | shape: `{np.array(shap_values).shape}`")
+        cs1, cs2 = st.columns(2)
+        with cs1: st.pyplot(viz.plot_shap_bar(explainer, shap_values, X_df, best_name))
+        with cs2: st.pyplot(viz.plot_shap_summary(explainer, shap_values, X_df, best_name))
+    except Exception as e:
+        st.error(f"SHAP calculation failed: {e}")
+        import traceback
+        st.code(traceback.format_exc())
 
 # --- TAB 7: DIAGNOSIS ---
 with tabs[6]:
     st.header("🏥 Precision Patient Diagnosis")
-    st.info("Fill in the clinical details below. Features not specified will be set to the population average (mean) for the research model.")
+    st.warning("⚠️ Prediction is based on partial clinical input. Missing features are estimated using population statistics (Median).")
+    st.info("Fill in the clinical details below. Features not specified will be set to the population median for the research model.")
     
     with st.form("diag_form"):
         # Section 1: Demographics & Lifestyle
@@ -203,20 +213,20 @@ with tabs[6]:
             st.write("Adjust these for a more precise clinical profile.")
             ca1, ca2, ca3 = st.columns(3)
             with ca1:
-                sodium = st.number_input("Serum Sodium (mEq/L)", 130.0, 150.0, float(X_te_nl["SerumElectrolytesSodium"].mean()))
-                potassium = st.number_input("Serum Potassium (mEq/L)", 3.0, 6.0, float(X_te_nl["SerumElectrolytesPotassium"].mean()))
+                sodium = st.number_input("Serum Sodium (mEq/L)", 130.0, 150.0, float(X_te_nl["SerumElectrolytesSodium"].median()))
+                potassium = st.number_input("Serum Potassium (mEq/L)", 3.0, 6.0, float(X_te_nl["SerumElectrolytesPotassium"].median()))
             with ca2:
-                fatigue = st.slider("Fatigue Level (0-10)", 0, 10, int(X_te_nl["FatigueLevels"].mean()))
-                edema = st.selectbox("Edema (Swelling)", ["No", "Yes"], index=int(X_te_nl["Edema"].mean()))
+                fatigue = st.slider("Fatigue Level (0-10)", 0, 10, int(X_te_nl["FatigueLevels"].median()))
+                edema = st.selectbox("Edema (Swelling)", ["No", "Yes"], index=int(X_te_nl["Edema"].median()))
             with ca3:
-                qol = st.slider("Quality of Life Score", 0, 100, int(X_te_nl["QualityOfLifeScore"].mean()))
-                heavy_metals = st.checkbox("Heavy Metals Exposure", value=bool(X_te_nl["HeavyMetalsExposure"].mean() > 0.5))
+                qol = st.slider("Quality of Life Score", 0, 100, int(X_te_nl["QualityOfLifeScore"].median()))
+                heavy_metals = st.checkbox("Heavy Metals Exposure", value=bool(X_te_nl["HeavyMetalsExposure"].median() > 0.5))
 
         sub = st.form_submit_button("🚀 Generate Precision Diagnosis")
         
     if sub:
-        # 1. Use mean values as baseline for ALL features
-        input_row = X_te_nl.mean().to_frame().T.copy()
+        # 1. Use MEDIAN values as baseline for ALL features (more robust than mean)
+        input_row = X_te_nl.median().to_frame().T.copy()
         
         # 2. Overwrite with user input (mapping names to CSV columns)
         input_row["Age"] = age
@@ -244,15 +254,37 @@ with tabs[6]:
         input_row["Edema"] = 1 if edema == "Yes" else 0
         input_row["HeavyMetalsExposure"] = 1 if heavy_metals else 0
         
-        # Adherence mapping (based on training LabelEncoder: Adherent=0, Non-Adherent=1)
-        input_row["Adherence"] = 0 if adherence == "Adherent" else 1
+        # Adherence mapping (Dynamic via LabelEncoder)
+        input_row["Adherence"] = processor.le_adherence.transform([adherence])[0]
+
+        # --- Intelligent Feature Alignment ---
+        # If BP is high -> adjust related features
+        if systolic > 140:
+            input_row["FatigueLevels"] = max(input_row["FatigueLevels"].iloc[0], 6)
+            input_row["QualityOfLifeScore"] = min(input_row["QualityOfLifeScore"].iloc[0], 50)
+
+        # If sugar is high -> adjust HbA1c
+        if fbs > 126:
+            input_row["HbA1c"] = max(input_row["HbA1c"].iloc[0], 6.5)
+
+        # If BMI high -> adjust cholesterol
+        if bmi > 30:
+            input_row["CholesterolTotal"] = max(input_row["CholesterolTotal"].iloc[0], 220)
+
+        # If smoking -> worsen health indicators
+        if smoking == "Yes":
+            input_row["HemoglobinLevels"] = min(input_row["HemoglobinLevels"].iloc[0], 13)
 
         # 4. Ensure exact column order and alignment
         input_row = input_row[X_te_nl.columns]
         
         # 5. Prediction
-        prob = trained_nl[best_name].predict_proba(input_row)[0, 1]
-        assessment = trainer.get_clinical_assessment(prob)
+        prob = trained_nl[best_name]["calibrated"].predict_proba(input_row)[0, 1]
+        
+        # DEBUG: Verify Adherence encoding (Temporary)
+        st.write("Adherence Encoding Check:", X_te_nl["Adherence"].unique())
+        
+        assessment = trainer.get_clinical_assessment(prob, best_th)
         
         # Display Results
         col_res1, col_res2 = st.columns([1, 2])
@@ -268,6 +300,11 @@ with tabs[6]:
                 </div>
             """, unsafe_allow_html=True)
             
+            with st.expander("🔍 Model Confidence Details"):
+                st.write(f"**Probability:** {prob:.4f}")
+                st.write(f"**Optimal Threshold:** {best_th:.2f}")
+                st.write(f"**Clinical Prediction:** {'CKD' if prob >= best_th else 'Not CKD'}")
+            
         with col_res2:
             st.markdown(f"""
                 <div class='metric-card' style='border-left: 6px solid {assessment["Color"]};'>
@@ -281,7 +318,18 @@ with tabs[6]:
             
         st.markdown("### Feature Contribution Analysis")
         st.info("The chart below shows which features pushed the risk up (Red) or down (Blue) for THIS specific patient.")
-        st.pyplot(viz.plot_local_shap(explainer, shap_values, X_df, patient_idx=0))
+        
+        # 6. Individualized SHAP
+        st.write("Input shape:", input_row.shape)
+        try:
+            with st.spinner("Calculating local SHAP for this patient..."):
+                explainer_loc, shap_values_loc, X_df_loc = trainer.get_shap_explainer(trained_nl[best_name], input_row)
+                st.write(f"✅ Local SHAP type: `{type(shap_values_loc).__name__}` | shape: `{np.array(shap_values_loc).shape}`")
+                st.pyplot(viz.plot_local_shap(explainer_loc, shap_values_loc, X_df_loc, patient_idx=0))
+        except Exception as e:
+            st.error(f"Local SHAP failed: {e}")
+            import traceback
+            st.code(traceback.format_exc())
 
 st.markdown("---")
 st.caption("CKD Intelligence v3.2 — Precision Research Dashboard.")

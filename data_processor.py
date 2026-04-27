@@ -38,13 +38,15 @@ class CKDDataProcessor:
         )
         
         # Fit encoder on TRAIN only
-        le = LabelEncoder()
+        self.le_adherence = LabelEncoder()
+        le = self.le_adherence
         X_tr = X_tr_raw.copy()
         X_te = X_te_raw.copy()
         X_tr["Adherence"] = le.fit_transform(X_tr["Adherence"])
         
         # Map to test (Handle unseen)
         adherence_map = {cls: idx for idx, cls in enumerate(le.classes_)}
-        X_te["Adherence"] = X_te["Adherence"].map(lambda x: adherence_map.get(x, -1))
+        default_val = X_tr["Adherence"].mode()[0]
+        X_te["Adherence"] = X_te["Adherence"].map(lambda x: adherence_map.get(x, default_val))
         
         return X_tr, X_te, y_tr, y_te

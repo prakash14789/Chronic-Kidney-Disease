@@ -185,8 +185,8 @@ class CKDVisualizer:
         plt.style.use('dark_background')
         fig = plt.figure(figsize=(10, 6))
         fig.patch.set_facecolor(COLORS["bg"])
-        sv = shap_values[1] if isinstance(shap_values, list) else shap_values
-        shap.summary_plot(sv, X_df, show=False, plot_type="dot")
+        # shap_values is already class-1 numpy array
+        shap.summary_plot(shap_values, X_df, show=False, plot_type="dot")
         plt.title(f"SHAP Summary — {model_name}", color=COLORS["text"], pad=25, fontsize=14)
         return CKDVisualizer._fix_matplotlib_colors(fig)
 
@@ -195,8 +195,8 @@ class CKDVisualizer:
         plt.style.use('dark_background')
         fig = plt.figure(figsize=(10, 6))
         fig.patch.set_facecolor(COLORS["bg"])
-        sv = shap_values[1] if isinstance(shap_values, list) else shap_values
-        shap.summary_plot(sv, X_df, show=False, plot_type="bar")
+        # shap_values is already class-1 numpy array
+        shap.summary_plot(shap_values, X_df, show=False, plot_type="bar")
         plt.title(f"SHAP Feature Importance — {model_name}", color=COLORS["text"], pad=25, fontsize=14)
         return CKDVisualizer._fix_matplotlib_colors(fig)
 
@@ -205,15 +205,22 @@ class CKDVisualizer:
         plt.style.use('dark_background')
         fig = plt.figure(figsize=(10, 5))
         fig.patch.set_facecolor(COLORS["bg"])
-        if hasattr(shap_values, "base_values"):
-            shap.plots.waterfall(shap_values[patient_idx], show=False)
+        
+        # Build proper SHAP Explanation object for waterfall
+        if isinstance(shap_values, np.ndarray):
+            base_val = explainer.expected_value
+            if isinstance(base_val, (list, np.ndarray)):
+                base_val = base_val[1]  # class 1
+            
+            explanation = shap.Explanation(
+                values=shap_values[patient_idx],
+                base_values=base_val,
+                data=X_df.iloc[patient_idx].values,
+                feature_names=X_df.columns.tolist()
+            )
+            shap.plots.waterfall(explanation, max_display=10, show=False)
         else:
-            if isinstance(shap_values, list):
-                sv = shap_values[1][patient_idx]
-                base = explainer.expected_value[1]
-            else:
-                sv = shap_values[patient_idx]
-                base = explainer.expected_value
-            shap.plots._waterfall.waterfall_legacy(base, sv, feature_names=X_df.columns, show=False)
+            shap.plots.waterfall(shap_values[patient_idx], max_display=10, show=False)
+        
         plt.title("Individual Risk Factors", color=COLORS["text"], pad=25, fontsize=14)
         return CKDVisualizer._fix_matplotlib_colors(fig)
