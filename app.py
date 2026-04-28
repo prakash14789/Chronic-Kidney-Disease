@@ -57,6 +57,7 @@ def run_full_pipeline(sample_n):
     leakage_cols = ["GFR", "SerumCreatinine", "BUNLevels", "ProteinInUrine", "ACR"]
     X_tr_nl = X_tr_f.drop(columns=leakage_cols, errors="ignore")
     X_te_nl = X_te_f.drop(columns=leakage_cols, errors="ignore")
+    X_te_nl = X_te_nl[X_tr_nl.columns]  # Enforce exact column order match
     
     n_neg, n_pos = (y_tr_f == 0).sum(), (y_tr_f == 1).sum()
     
@@ -98,7 +99,7 @@ with tabs[0]:
     with col1: st.plotly_chart(viz.plot_class_distribution(df_full, ckd_pct), use_container_width=True, key="dist")
     with col2:
         st.write("### v3 Hygiene Checklist")
-        st.checkbox("LabelEncoder fitted on Train only", value=True, disabled=True)
+        st.checkbox("Adherence encoded globally before split", value=True, disabled=True)
         st.checkbox("Leakage-free derived from same split", value=True, disabled=True)
         st.checkbox("SMOTE lives inside Pipeline", value=True, disabled=True)
     
@@ -151,7 +152,8 @@ with tabs[4]:
 with tabs[5]:
     st.header("🧠 Model Interpretation (SHAP)")
     with st.spinner("Calculating Global SHAP..."):
-        explainer, shap_values, X_df = trainer.get_shap_explainer(trained_nl[best_name], X_te_nl)
+        X_test_df = pd.DataFrame(X_te_nl.values, columns=X_te_nl.columns).reset_index(drop=True)
+        explainer, shap_values, X_df = trainer.get_shap_explainer(trained_nl[best_name], X_test_df)
     cs1, cs2 = st.columns(2)
     with cs1: st.pyplot(viz.plot_shap_bar(explainer, shap_values, X_df, best_name))
     with cs2: st.pyplot(viz.plot_shap_summary(explainer, shap_values, X_df, best_name))

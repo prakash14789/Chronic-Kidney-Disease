@@ -28,23 +28,23 @@ class CKDDataProcessor:
         return df
 
     def split_and_encode_v3(self, df, target="Diagnosis"):
-        """EXACT V3 Encoding and Splitting Logic."""
+        """V3 Encoding and Splitting — encode before split for consistency."""
         X = df.drop(columns=[target])
         y = df[target]
-        
-        # Split first
-        X_tr_raw, X_te_raw, y_tr, y_te = train_test_split(
+
+        # Encode BEFORE split — same mapping everywhere, no -1 fallback
+        le = LabelEncoder()
+        X["Adherence"] = le.fit_transform(X["Adherence"])
+
+        # Now split
+        X_tr, X_te, y_tr, y_te = train_test_split(
             X, y, test_size=0.2, random_state=self.random_state, stratify=y
         )
-        
-        # Fit encoder on TRAIN only
-        le = LabelEncoder()
-        X_tr = X_tr_raw.copy()
-        X_te = X_te_raw.copy()
-        X_tr["Adherence"] = le.fit_transform(X_tr["Adherence"])
-        
-        # Map to test (Handle unseen)
-        adherence_map = {cls: idx for idx, cls in enumerate(le.classes_)}
-        X_te["Adherence"] = X_te["Adherence"].map(lambda x: adherence_map.get(x, -1))
-        
-        return X_tr, X_te, y_tr, y_te
+
+        # Reset indices to avoid SHAP misalignment
+        return (
+            X_tr.reset_index(drop=True),
+            X_te.reset_index(drop=True),
+            y_tr.reset_index(drop=True),
+            y_te.reset_index(drop=True)
+        )
