@@ -187,3 +187,71 @@ class CKDModelTrainer:
             explainer = shap.Explainer(clf, X_df)
             shap_values = explainer(X_df)
             return explainer, shap_values, X_df
+
+    def find_similar_patients(self, X_train, y_train, input_row, n=5):
+        """Find n most similar patients using euclidean distance."""
+        from sklearn.metrics.pairwise import euclidean_distances
+        dist = euclidean_distances(X_train.values, input_row.values)
+        closest_idx = np.argsort(dist.ravel())[:n]
+        return X_train.iloc[closest_idx], y_train.iloc[closest_idx], dist.ravel()[closest_idx]
+
+    def compute_counterfactual(self, model, input_row):
+        """What-if: change one feature at a time, measure risk change."""
+        base_prob = model.predict_proba(input_row)[0, 1]
+        mods = {"SystolicBP": -20, "DiastolicBP": -10, "FastingBloodSugar": -20,
+                "HbA1c": -1.0, "BMI": -3, "PhysicalActivity": +50,
+                "DietQuality": +3, "SleepQuality": +2, "CholesterolTotal": -30, "FatigueLevels": -3}
+        results = {}
+        for feat, delta in mods.items():
+            if feat in input_row.columns:
+                temp = input_row.copy()
+                temp[feat] = temp[feat] + delta
+                results[f"{feat} ({delta:+g})"] = model.predict_proba(temp)[0, 1] - base_prob
+        return base_prob, results
+
+    def get_grouped_shap(self, shap_values, feature_names):
+        """Compute average absolute SHAP per feature group."""
+        groups = {
+            "Lifestyle": ["BMI", "PhysicalActivity", "DietQuality", "SleepQuality", "Smoking"],
+            "Clinical": ["SystolicBP", "DiastolicBP", "FastingBloodSugar", "HbA1c", "HemoglobinLevels"],
+            "Biochemical": ["SerumElectrolytesSodium", "SerumElectrolytesPotassium", "CholesterolTotal"],
+            "Demographics": ["Age", "Gender"],
+            "Family History": ["FamilyHistoryKidneyDisease", "FamilyHistoryHypertension", "FamilyHistoryDiabetes"],
+            "Other": ["Adherence", "Edema", "FatigueLevels", "QualityOfLifeScore", "HeavyMetalsExposure"]
+        }
+        sv = shap_values[1] if isinstance(shap_values, list) else shap_values
+        feat_list = list(feature_names)
+        result = {}
+        for gname, feats in groups.items():
+            total = sum(np.abs(sv[:, feat_list.index(f)]).mean() for f in feats if f in feat_list)
+            result[gname] = total
+        return result
+
+    def run_stability_check_multi(self, X, y, n_runs=5):
+        """Run model across multiple splits to check stability."""
+        from sklearn.model_selection import StratifiedShuffleSplit
+        scores = []
+        sss = StratifiedShuffleSplit(n_splits=n_runs, test_size=0.2, random_state=self.random_state)
+        for train_idx, test_idx in sss.split(X, y):
+            X_tr, X_te = X.iloc[train_idx], X.iloc[test_idx]
+            y_tr, y_te = y.iloc[train_idx], y.iloc[test_idx]
+            n_neg, n_pos = (y_tr == 0).sum(), (y_tr == 1).sum()
+            pipes = self.get_v3_pipelines(n_neg, n_pos)
+            _, pipe = pipes[0]
+            pipe.fit(X_tr, y_tr)
+            scores.append(balanced_accuracy_score(y_te, pipe.predict(X_te)))
+        return scores
+
+    def get_error_analysis(self, model, X_test, y_test):
+        """Analyze FP, FN, TP, TN patterns."""
+        y_pred = model.predict(X_test)
+        fp_mask = (y_test.values == 0) & (y_pred == 1)
+        fn_mask = (y_test.values == 1) & (y_pred == 0)
+        tp_mask = (y_test.values == 1) & (y_pred == 1)
+        tn_mask = (y_test.values == 0) & (y_pred == 0)
+        return {
+            "counts": {"TP": int(tp_mask.sum()), "TN": int(tn_mask.sum()),
+                       "FP": int(fp_mask.sum()), "FN": int(fn_mask.sum())},
+            "fp_data": X_test[fp_mask], "fn_data": X_test[fn_mask],
+            "y_pred": y_pred
+        }
