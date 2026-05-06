@@ -51,6 +51,7 @@ with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3067/3067451.png", width=80)
     sample_size = st.slider("Stratified Sample Size", 1000, 10000, 5000)
     st.divider()
+    st.markdown("[🔗 View Source on GitHub](https://github.com/prakash14789/Chronic-Kidney-Disease)")
     st.success("v3 Research Pipeline Active")
 
 # --- PIPELINE EXECUTION ---
@@ -67,21 +68,27 @@ def run_full_pipeline(sample_n):
     
     n_neg, n_pos = (y_tr_f == 0).sum(), (y_tr_f == 1).sum()
     
-    pipes_f = trainer.get_v3_pipelines(n_neg, n_pos)
+    # 1. Experiment 1: Full Features (With SMOTE)
+    pipes_f = trainer.get_v3_pipelines(n_neg, n_pos, use_smote=True)
     res_f, roc_f, pr_f, trained_f = trainer.run_v3_experiment(X_tr_f, X_te_f, y_tr_f, y_te_f, pipelines=pipes_f)
     
-    pipes_nl = trainer.get_v3_pipelines(n_neg, n_pos)
+    # 2. Experiment 2: No-Leakage (With SMOTE)
+    pipes_nl = trainer.get_v3_pipelines(n_neg, n_pos, use_smote=True)
     res_nl, roc_nl, pr_nl, trained_nl = trainer.run_v3_experiment(X_tr_nl, X_te_nl, y_tr_f, y_te_f, pipelines=pipes_nl)
+    
+    # 3. Experiment 3: No-Leakage (WITHOUT SMOTE) for comparison
+    pipes_no_smote = trainer.get_v3_pipelines(n_neg, n_pos, use_smote=False)
+    res_no_smote, _, _, _ = trainer.run_v3_experiment(X_tr_nl, X_te_nl, y_tr_f, y_te_f, pipelines=pipes_no_smote)
     
     best_name = res_nl.iloc[0]["Model"]
     y_proba = trained_nl[best_name].predict_proba(X_te_nl)[:, 1]
     _, best_th = trainer.tune_threshold(y_te_f, y_proba)
     
     return (df_full, df_sample, res_f, roc_f, res_nl, roc_nl, pr_nl,
-            trained_nl, X_tr_nl, X_te_nl, y_tr_f, y_te_f, best_th)
+            trained_nl, X_tr_nl, X_te_nl, y_tr_f, y_te_f, best_th, res_no_smote)
 
 (df_full, df_sample, res_f, roc_f, res_nl, roc_nl, pr_nl,
- trained_nl, X_tr_nl, X_te_nl, y_tr_f, y_te_f, best_th) = run_full_pipeline(sample_size)
+ trained_nl, X_tr_nl, X_te_nl, y_tr_f, y_te_f, best_th, res_no_smote) = run_full_pipeline(sample_size)
 
 # Derived values
 best_name = res_nl.iloc[0]["Model"]
@@ -98,7 +105,7 @@ with k4: st.metric("📊 Dataset Size", f"{len(df_full):,} → {sample_size}")
 
 tabs = st.tabs([
     "📊 Data Audit", "🚀 Exp 1 (Full)", "🛡️ Exp 2 (No-Leakage)", "📉 Comparison",
-    "🎯 Threshold Tuning", "🧠 SHAP Interpretation", "🔬 Deep Analysis", "🏥 Patient Diagnosis"
+    "🧬 SMOTE Insights", "🎯 Threshold Tuning", "🧠 SHAP Interpretation", "🔬 Deep Analysis", "🏥 Patient Diagnosis"
 ])
 
 # --- TAB 1: DATA AUDIT ---
@@ -146,8 +153,53 @@ with tabs[3]:
     with col_c2: st.plotly_chart(viz.plot_precision_recall_f1(res_nl), use_container_width=True, key="pr_f1")
     st.plotly_chart(viz.plot_age_distribution(df_sample), use_container_width=True, key="age_dist")
 
-# --- TAB 5: THRESHOLD ---
+# --- TAB 5: SMOTE INSIGHTS ---
 with tabs[4]:
+    st.header("🧬 SMOTE Impact Analysis")
+    st.info("SMOTE (Synthetic Minority Over-sampling Technique) creates artificial samples to balance the dataset. In our CKD case (92/8 split), it targets the 'Healthy' minority.")
+    
+    # Side-by-side comparison
+    col_s1, col_s2 = st.columns(2)
+    with col_s1:
+        st.subheader("Results WITH SMOTE")
+        st.dataframe(res_nl[['Model', 'Balanced Accuracy', 'Macro F1', 'Macro Recall']].head(5), use_container_width=True)
+    with col_s2:
+        st.subheader("Results WITHOUT SMOTE")
+        st.dataframe(res_no_smote[['Model', 'Balanced Accuracy', 'Macro F1', 'Macro Recall']].head(5), use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("🔍 Why do metrics fall after SMOTE?")
+    
+    sc1, sc2 = st.columns(2)
+    with sc1:
+        st.markdown(f"""
+        <div class='glass-card'>
+        <h4>1. The Accuracy Trap</h4>
+        <p>With a 92% majority class, a model that guesses 'Sick' for everyone is 92% accurate but useless. SMOTE forces the model to learn the harder 8% (Healthy), which naturally drops the 'easy' accuracy score.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class='glass-card'>
+        <h4>2. Redundancy</h4>
+        <p>Your models already use <strong>class_weight='balanced'</strong>. Adding SMOTE on top can be overkill, making the model over-sensitive to the minority class and increasing False Positives.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with sc2:
+        st.markdown(f"""
+        <div class='glass-card'>
+        <h4>3. Boundary Blurring</h4>
+        <p>SMOTE creates points by drawing lines between existing ones. If Healthy and Sick patients have overlapping features, SMOTE creates 'synthetic noise' in the overlap, confusing the model.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class='glass-card'>
+        <h4>4. The Trade-off</h4>
+        <p>SMOTE is used to improve <strong>Minority Recall</strong> (finding healthy people). We often accept a drop in Precision or Accuracy to ensure the model isn't just ignoring the minority group.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+# --- TAB 6: THRESHOLD ---
+with tabs[5]:
     st.header("Decision Threshold Optimization")
     th_df, _ = trainer.tune_threshold(y_te_f, y_proba_all)
     st.plotly_chart(viz.plot_threshold_tuning(th_df, best_th), use_container_width=True, key="th_tune")
@@ -164,8 +216,8 @@ with tabs[4]:
         acc = trainer.run_sanity_check(trained_nl[best_name], X_te_nl, y_te_f)
         st.metric("Shuffled Balanced Accuracy", f"{acc:.2%}")
 
-# --- TAB 6: SHAP ---
-with tabs[5]:
+# --- TAB 7: SHAP ---
+with tabs[6]:
     st.header("🧠 Model Interpretation (SHAP)")
     with st.spinner("Calculating Global SHAP..."):
         X_test_df = pd.DataFrame(X_te_nl.values, columns=X_te_nl.columns).reset_index(drop=True)
@@ -178,8 +230,8 @@ with tabs[5]:
     group_imp = trainer.get_grouped_shap(shap_values, X_df.columns)
     st.plotly_chart(viz.plot_grouped_shap(group_imp), use_container_width=True, key="grp_shap")
 
-# --- TAB 7: DEEP ANALYSIS ---
-with tabs[6]:
+# --- TAB 8: DEEP ANALYSIS ---
+with tabs[7]:
     st.header("🔬 Deep Analysis")
 
     # 1. Feature Direction
@@ -232,8 +284,8 @@ with tabs[6]:
         </div>
         """, unsafe_allow_html=True)
 
-# --- TAB 8: DIAGNOSIS ---
-with tabs[7]:
+# --- TAB 9: DIAGNOSIS ---
+with tabs[8]:
     st.header("🏥 Precision Patient Diagnosis")
     st.info("Fill in the clinical details below. Features not specified will be set to the population average.")
     
