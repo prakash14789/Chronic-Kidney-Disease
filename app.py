@@ -53,13 +53,14 @@ with st.sidebar:
     st.title("🧬 CKD Intelligence")
     st.image("https://cdn-icons-png.flaticon.com/512/3067/3067451.png", width=80)
     sample_size = st.slider("Stratified Sample Size", 1000, 10000, 5000)
+    use_cv = st.checkbox("Enable Cross-Validation (Slower)", value=False)
     st.divider()
     st.markdown("[🔗 View Source on GitHub](https://github.com/prakash14789/Chronic-Kidney-Disease)")
     st.success("v3 Research Pipeline Active")
 
 # --- PIPELINE EXECUTION ---
 @st.cache_data
-def run_full_pipeline(sample_n):
+def run_full_pipeline(sample_n, use_cv=False):
     df_full = processor.load_raw_data()
     df_sample = processor.get_v3_refined_data(df_full, sample_n=sample_n)
     X_tr_f, X_te_f, y_tr_f, y_te_f = processor.split_and_encode_v3(df_sample)
@@ -73,15 +74,15 @@ def run_full_pipeline(sample_n):
     
     # 1. Experiment 1: Full Features (With SMOTE)
     pipes_f = trainer.get_v3_pipelines(n_neg, n_pos, use_smote=True)
-    res_f, roc_f, pr_f, trained_f = trainer.run_v3_experiment(X_tr_f, X_te_f, y_tr_f, y_te_f, pipelines=pipes_f)
+    res_f, roc_f, pr_f, trained_f = trainer.run_v3_experiment(X_tr_f, X_te_f, y_tr_f, y_te_f, pipelines=pipes_f, use_cv=use_cv)
     
     # 2. Experiment 2: No-Leakage (With SMOTE)
     pipes_nl = trainer.get_v3_pipelines(n_neg, n_pos, use_smote=True)
-    res_nl, roc_nl, pr_nl, trained_nl = trainer.run_v3_experiment(X_tr_nl, X_te_nl, y_tr_f, y_te_f, pipelines=pipes_nl)
+    res_nl, roc_nl, pr_nl, trained_nl = trainer.run_v3_experiment(X_tr_nl, X_te_nl, y_tr_f, y_te_f, pipelines=pipes_nl, use_cv=use_cv)
     
     # 3. Experiment 3: No-Leakage (WITHOUT SMOTE) for comparison
     pipes_no_smote = trainer.get_v3_pipelines(n_neg, n_pos, use_smote=False)
-    res_no_smote, _, _, _ = trainer.run_v3_experiment(X_tr_nl, X_te_nl, y_tr_f, y_te_f, pipelines=pipes_no_smote)
+    res_no_smote, _, _, _ = trainer.run_v3_experiment(X_tr_nl, X_te_nl, y_tr_f, y_te_f, pipelines=pipes_no_smote, use_cv=use_cv)
     
     best_name = res_nl.iloc[0]["Model"]
     y_proba = trained_nl[best_name].predict_proba(X_te_nl)[:, 1]
@@ -91,7 +92,7 @@ def run_full_pipeline(sample_n):
             trained_nl, X_tr_nl, X_te_nl, y_tr_f, y_te_f, best_th, res_no_smote)
 
 (df_full, df_sample, res_f, roc_f, res_nl, roc_nl, pr_nl,
- trained_nl, X_tr_nl, X_te_nl, y_tr_f, y_te_f, best_th, res_no_smote) = run_full_pipeline(sample_size)
+ trained_nl, X_tr_nl, X_te_nl, y_tr_f, y_te_f, best_th, res_no_smote) = run_full_pipeline(sample_size, use_cv=use_cv)
 
 # Derived values
 best_name = res_nl.iloc[0]["Model"]

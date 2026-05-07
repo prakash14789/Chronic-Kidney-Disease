@@ -60,7 +60,7 @@ class CKDModelTrainer:
             ("Decision Tree", DecisionTreeClassifier(max_depth=8, class_weight="balanced", random_state=self.random_state), False),
             ("Random Forest", RandomForestClassifier(n_estimators=100, class_weight="balanced", random_state=self.random_state, n_jobs=-1), False),
             ("Gradient Boosting", GradientBoostingClassifier(n_estimators=100, subsample=0.8, random_state=self.random_state), False),
-            ("SVM", SVC(probability=True, kernel="rbf", class_weight="balanced", random_state=self.random_state), True),
+            ("SVM", SVC(probability=True, kernel="rbf", class_weight="balanced", random_state=self.random_state, max_iter=2000), True),
             ("KNN", KNeighborsClassifier(n_neighbors=7, n_jobs=-1), True),
             ("Naive Bayes", GaussianNB(), False),
             ("Extra Trees", ExtraTreesClassifier(n_estimators=100, max_depth=8, class_weight="balanced", random_state=self.random_state, n_jobs=-1), False),
@@ -75,15 +75,19 @@ class CKDModelTrainer:
         
         return [(name, self.build_pipeline(clf, needs_scaling=sc, use_smote=use_smote)) for name, clf, sc in base]
 
-    def run_v3_experiment(self, X_tr, X_te, y_tr, y_te, pipelines):
-        """EXACT V3 Experiment Runner."""
+    def run_v3_experiment(self, X_tr, X_te, y_tr, y_te, pipelines, use_cv=False):
+        """EXACT V3 Experiment Runner optimized for speed."""
         cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=self.random_state)
         results, roc_data, pr_data, trained = [], {}, {}, {}
 
         for name, pipe in pipelines:
             t0 = time.time()
             try:
-                cv_scores = cross_val_score(pipe, X_tr, y_tr, cv=cv, scoring="balanced_accuracy", n_jobs=-1)
+                cv_mean = 0.0
+                if use_cv:
+                    cv_scores = cross_val_score(pipe, X_tr, y_tr, cv=cv, scoring="balanced_accuracy", n_jobs=-1)
+                    cv_mean = cv_scores.mean()
+                
                 pipe.fit(X_tr, y_tr)
                 y_pred = pipe.predict(X_te)
                 y_proba = pipe.predict_proba(X_te)[:, 1]
@@ -104,7 +108,7 @@ class CKDModelTrainer:
                     "Macro F1": round(f1_score(y_te, y_pred, average="macro", zero_division=0), 4),
                     "ROC-AUC": round(auc, 4),
                     "Cohen Kappa": round(cohen_kappa_score(y_te, y_pred), 4),
-                    "CV BalAcc Mean": round(cv_scores.mean(), 4),
+                    "CV BalAcc Mean": round(cv_mean, 4) if use_cv else "Skipped",
                     "Train Time (s)": round(time.time() - t0, 2),
                 })
             except Exception as e:
