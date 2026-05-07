@@ -255,3 +255,16 @@ class CKDModelTrainer:
             "fp_data": X_test[fp_mask], "fn_data": X_test[fn_mask],
             "y_pred": y_pred
         }
+
+    def get_patient_shap_highlights(self, shap_values, feature_names, patient_idx=0, top_n=10):
+        """Extracts top_n features with highest absolute SHAP impact for a patient."""
+        sv = shap_values[1] if isinstance(shap_values, list) else shap_values
+        # Handle SHAP .values or array
+        vals = sv.values[patient_idx] if hasattr(sv, 'values') else sv[patient_idx]
+        
+        df = pd.DataFrame({
+            'Feature': feature_names,
+            'Impact': vals
+        })
+        df['AbsImpact'] = df['Impact'].abs()
+        return df.sort_values('AbsImpact', ascending=False).head(top_n).drop(columns=['AbsImpact'])

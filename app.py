@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import datetime
 from data_processor import CKDDataProcessor
 from model_trainer import CKDModelTrainer
 from visualizer import CKDVisualizer, COLORS
+from report_generator import CKDReportGenerator
 
 # Page Config
 st.set_page_config(page_title="CKD Clinical Intelligence v3.2", page_icon="🧬", layout="wide")
@@ -44,6 +46,7 @@ st.markdown(f"""
 processor = CKDDataProcessor()
 trainer = CKDModelTrainer()
 viz = CKDVisualizer()
+reporter = CKDReportGenerator()
 
 # Sidebar
 with st.sidebar:
@@ -383,6 +386,29 @@ with tabs[8]:
                 </div>
             """, unsafe_allow_html=True)
         
+        # --- REPORT GENERATION ---
+        st.markdown("### 📄 Clinical Documentation")
+        shap_highlights = trainer.get_patient_shap_highlights(shap_values, X_df.columns, patient_idx=0)
+        
+        # We need to map internal names back to readable names if possible, but internal are fine for now.
+        patient_summary = {
+            "Age": age, "Gender": gender, "BMI": bmi, "Systolic BP": systolic,
+            "Diastolic BP": diastolic, "HbA1c": hba1c, "Hemoglobin": hemoglobin,
+            "Adherence": adherence
+        }
+        
+        if st.button("🛠️ Prepare Clinical Report"):
+            with st.spinner("Generating professional PDF..."):
+                report_path = reporter.generate_patient_report(patient_summary, prob, assessment, shap_highlights)
+                with open(report_path, "rb") as f:
+                    st.download_button(
+                        label="📥 Download Clinical PDF Report",
+                        data=f,
+                        file_name=f"CKD_Patient_Report_{datetime.datetime.now().strftime('%Y%m%d')}.pdf",
+                        mime="application/pdf"
+                    )
+                st.success("Report ready for download!")
+
         st.markdown("---")
         
         # Counterfactual What-If

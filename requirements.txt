@@ -9,3 +9,5 @@ lightgbm
 imbalanced-learn
 shap
 seaborn
+fpdf2
+kaleido

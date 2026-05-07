@@ -1,0 +1,134 @@
+from fpdf import FPDF
+import datetime
+import pandas as pd
+import numpy as np
+import os
+
+class CKDReportGenerator:
+    def __init__(self):
+        self.output_dir = "reports"
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+
+    def generate_patient_report(self, patient_data, probability, assessment, shap_df):
+        """
+        Generates a professional PDF clinical report.
+        patient_data: dict of patient inputs
+        probability: float risk score
+        assessment: dict with 'Level', 'Color', 'Action', 'Icon'
+        shap_df: pd.DataFrame with 'Feature' and 'Impact' columns (top factors)
+        """
+        pdf = FPDF()
+        pdf.add_page()
+        
+        # --- Header ---
+        pdf.set_fill_color(30, 41, 59) # Deep blue/dark header
+        pdf.rect(0, 0, 210, 40, 'F')
+        
+        pdf.set_font("Arial", 'B', 24)
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(0, 15, "CKD Clinical Intelligence", ln=True, align='C')
+        
+        pdf.set_font("Arial", '', 12)
+        pdf.cell(0, 10, "Precision Risk Assessment Report", ln=True, align='C')
+        pdf.ln(15)
+        
+        # --- Patient Info Section ---
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Arial", 'B', 14)
+        pdf.cell(0, 10, "1. Patient Profile", ln=True)
+        pdf.set_font("Arial", '', 10)
+        
+        # Create a 2-column table for patient info
+        col_width = 45
+        row_height = 8
+        
+        items = list(patient_data.items())
+        for i in range(0, len(items), 2):
+            # Column 1
+            k1, v1 = items[i]
+            pdf.set_font("Arial", 'B', 10)
+            pdf.cell(col_width, row_height, f"{k1}:", border=1)
+            pdf.set_font("Arial", '', 10)
+            pdf.cell(col_width, row_height, f"{v1}", border=1)
+            
+            # Column 2
+            if i + 1 < len(items):
+                k2, v2 = items[i+1]
+                pdf.set_font("Arial", 'B', 10)
+                pdf.cell(col_width, row_height, f"{k2}:", border=1)
+                pdf.set_font("Arial", '', 10)
+                pdf.cell(col_width, row_height, f"{v2}", border=1)
+            pdf.ln(row_height)
+            
+        pdf.ln(10)
+        
+        # --- Diagnosis Result ---
+        pdf.set_font("Arial", 'B', 14)
+        pdf.cell(0, 10, "2. Clinical Diagnosis & Assessment", ln=True)
+        
+        # Risk Box
+        pdf.set_fill_color(248, 250, 252)
+        pdf.rect(10, pdf.get_y(), 190, 35, 'F')
+        
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(0, 10, f"Risk Score: {probability:.1%}", ln=True, align='C')
+        
+        # Level with color (approximated)
+        level_text = assessment['Level'].upper()
+        pdf.set_font("Arial", 'B', 16)
+        if "High" in level_text:
+            pdf.set_text_color(239, 68, 68) # Red
+        elif "Moderate" in level_text:
+            pdf.set_text_color(245, 158, 11) # Orange/Yellow
+        else:
+            pdf.set_text_color(34, 197, 94) # Green
+            
+        pdf.cell(0, 10, level_text, ln=True, align='C')
+        
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Arial", 'I', 11)
+        pdf.multi_cell(0, 8, f"Recommendation: {assessment['Action']}", align='C')
+        pdf.ln(10)
+        
+        # --- Risk Factors (SHAP) ---
+        pdf.set_font("Arial", 'B', 14)
+        pdf.cell(0, 10, "3. Primary Risk Factors (AI Analysis)", ln=True)
+        pdf.set_font("Arial", '', 10)
+        pdf.multi_cell(0, 6, "The following factors were identified by the AI model as the most significant contributors to this patient's risk profile.")
+        pdf.ln(2)
+        
+        # SHAP Table Header
+        pdf.set_fill_color(226, 232, 240)
+        pdf.set_font("Arial", 'B', 10)
+        pdf.cell(100, 8, "Clinical Feature", border=1, fill=True)
+        pdf.cell(90, 8, "Impact on Risk", border=1, fill=True)
+        pdf.ln(8)
+        
+        pdf.set_font("Arial", '', 10)
+        for _, row in shap_df.iterrows():
+            pdf.cell(100, 8, f"{row['Feature']}", border=1)
+            impact = "Increases Risk" if row['Impact'] > 0 else "Reduces Risk"
+            if row['Impact'] > 0:
+                pdf.set_text_color(239, 68, 68)
+            else:
+                pdf.set_text_color(34, 197, 94)
+            pdf.cell(90, 8, f"{impact} (magnitude: {abs(row['Impact']):.4f})", border=1)
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln(8)
+            
+        # --- Footer ---
+        pdf.set_y(-30)
+        pdf.set_font("Arial", 'I', 8)
+        pdf.set_text_color(100, 116, 139)
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        pdf.cell(0, 10, f"Report Generated on: {timestamp} | CKD Intelligence v3.2 Research System", ln=False, align='L')
+        pdf.cell(0, 10, f"Page {pdf.page_no()}", ln=False, align='R')
+        
+        # Disclaimer
+        pdf.set_y(-20)
+        pdf.multi_cell(0, 4, "Disclaimer: This report is generated by an AI research system for educational and clinical decision support purposes. It should not replace professional medical judgment. Final diagnosis must be confirmed by a licensed nephrologist.", align='C')
+        
+        report_path = os.path.join(self.output_dir, f"CKD_Report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
+        pdf.output(report_path)
+        return report_path
