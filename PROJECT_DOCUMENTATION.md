@@ -73,6 +73,7 @@ CKD/
 ├── data_processor.py             ← 📦  Loads & prepares the data
 ├── model_trainer.py              ← 🤖  Trains & evaluates AI models
 ├── visualizer.py                 ← 📊  Creates all charts & graphs
+├── report_generator.py           ← 📄  Generates professional clinical PDF reports
 ├── chronic_kidney_disease.py     ← 📓  Original research script (standalone version)
 ├── Chronickidneydiseases.csv     ← 📄  The patient data file
 ├── requirements.txt              ← 📋  List of software needed
@@ -418,6 +419,7 @@ This is the **star feature**. A doctor can:
    - **5 most similar patients** from the dataset
    - **Protective vs Risk factors** explained visually
    - **SHAP waterfall** showing exact feature contributions
+   - **📄 Clinical PDF Report** — A downloadable, professional report for clinical records
 
 ---
 
