@@ -45,6 +45,7 @@ st.markdown(f"""
 # --- LOGIN SYSTEM ---
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
+    st.session_state['role'] = None
 
 def login_page():
     # Center the login form
@@ -64,7 +65,13 @@ def login_page():
             if submit:
                 if username == "admin" and password == "admin":
                     st.session_state['logged_in'] = True
-                    st.success("Access Granted!")
+                    st.session_state['role'] = "admin"
+                    st.success("Admin Access Granted!")
+                    st.rerun()
+                elif username == "client" and password == "client":
+                    st.session_state['logged_in'] = True
+                    st.session_state['role'] = "client"
+                    st.success("Client Access Granted!")
                     st.rerun()
                 else:
                     st.error("Invalid username or password")
@@ -138,189 +145,203 @@ with k2: st.metric("🎯 Balanced Accuracy", f"{res_nl.iloc[0]['Balanced Accurac
 with k3: st.metric("📈 ROC-AUC", f"{res_nl.iloc[0]['ROC-AUC']:.4f}")
 with k4: st.metric("📊 Dataset Size", f"{len(df_full):,} → {sample_size}")
 
-tabs = st.tabs([
-    "📊 Data Audit", "🚀 Exp 1 (Full)", "🛡️ Exp 2 (No-Leakage)", "📉 Comparison",
-    "🧬 SMOTE Insights", "🎯 Threshold Tuning", "🧠 SHAP Interpretation", "🔬 Deep Analysis", "🏥 Patient Diagnosis"
-])
+if st.session_state['role'] == "admin":
+    tabs = st.tabs([
+        "📊 Data Audit", "🚀 Exp 1 (Full)", "🛡️ Exp 2 (No-Leakage)", "📉 Comparison",
+        "🧬 SMOTE Insights", "🎯 Threshold Tuning", "🧠 SHAP Interpretation", "🔬 Deep Analysis", "🏥 Patient Diagnosis"
+    ])
+    t_audit, t_exp1, t_exp2, t_comp, t_smote, t_th, t_shap, t_deep, t_diag = tabs
+else:
+    tabs = st.tabs(["🏥 Patient Diagnosis"])
+    t_diag = tabs[0]
+    t_audit = t_exp1 = t_exp2 = t_comp = t_smote = t_th = t_shap = t_deep = None
 
 # --- TAB 1: DATA AUDIT ---
-with tabs[0]:
-    st.header("1. Class Imbalance & Audit")
-    col1, col2 = st.columns([1, 2])
-    with col1: st.plotly_chart(viz.plot_class_distribution(df_full, ckd_pct), use_container_width=True, key="dist")
-    with col2:
-        st.write("### v3 Hygiene Checklist")
-        st.checkbox("Adherence encoded globally before split", value=True, disabled=True)
-        st.checkbox("Leakage-free derived from same split", value=True, disabled=True)
-        st.checkbox("SMOTE lives inside Pipeline", value=True, disabled=True)
-    st.markdown("---")
-    st.header("2. Correlation & Clinical Distributions")
-    st.pyplot(viz.plot_correlation_heatmap(df_sample))
-    st.plotly_chart(viz.plot_clinical_boxplots(df_sample), use_container_width=True)
+if t_audit:
+    with t_audit:
+        st.header("1. Class Imbalance & Audit")
+        col1, col2 = st.columns([1, 2])
+        with col1: st.plotly_chart(viz.plot_class_distribution(df_full, ckd_pct), use_container_width=True, key="dist")
+        with col2:
+            st.write("### v3 Hygiene Checklist")
+            st.checkbox("Adherence encoded globally before split", value=True, disabled=True)
+            st.checkbox("Leakage-free derived from same split", value=True, disabled=True)
+            st.checkbox("SMOTE lives inside Pipeline", value=True, disabled=True)
+        st.markdown("---")
+        st.header("2. Correlation & Clinical Distributions")
+        st.pyplot(viz.plot_correlation_heatmap(df_sample))
+        st.plotly_chart(viz.plot_clinical_boxplots(df_sample), use_container_width=True)
 
 # --- TAB 2: EXP 1 ---
-with tabs[1]:
-    st.header("Experiment 1: Full Features")
-    st.dataframe(res_f[['Model', 'Balanced Accuracy', 'Macro F1', 'ROC-AUC']], use_container_width=True)
-    st.plotly_chart(viz.plot_roc_curves(roc_f), use_container_width=True, key="roc_f")
+if t_exp1:
+    with t_exp1:
+        st.header("Experiment 1: Full Features")
+        st.dataframe(res_f[['Model', 'Balanced Accuracy', 'Macro F1', 'ROC-AUC']], use_container_width=True)
+        st.plotly_chart(viz.plot_roc_curves(roc_f), use_container_width=True, key="roc_f")
 
 # --- TAB 3: EXP 2 ---
-with tabs[2]:
-    st.header("Experiment 2: Leakage-Free (Research Grade)")
-    st.dataframe(res_nl[['Model', 'Balanced Accuracy', 'Macro F1', 'ROC-AUC']], use_container_width=True)
-    st.plotly_chart(viz.plot_roc_curves(roc_nl), use_container_width=True, key="roc_nl")
-    # Confusion Matrix
-    err = trainer.get_error_analysis(trained_nl[best_name], X_te_nl, y_te_f)
-    st.plotly_chart(viz.plot_confusion_matrix(err["counts"]), use_container_width=True, key="cm")
+if t_exp2:
+    with t_exp2:
+        st.header("Experiment 2: Leakage-Free (Research Grade)")
+        st.dataframe(res_nl[['Model', 'Balanced Accuracy', 'Macro F1', 'ROC-AUC']], use_container_width=True)
+        st.plotly_chart(viz.plot_roc_curves(roc_nl), use_container_width=True, key="roc_nl")
+        # Confusion Matrix
+        err = trainer.get_error_analysis(trained_nl[best_name], X_te_nl, y_te_f)
+        st.plotly_chart(viz.plot_confusion_matrix(err["counts"]), use_container_width=True, key="cm")
 
 # --- TAB 4: COMPARISON ---
-with tabs[3]:
-    st.header("Performance Drop Comparison")
-    best_f = res_f.iloc[0]
-    best_nl = res_nl.iloc[0]
-    st.markdown(f"""
-    <div class='metric-card'>
-    <h4>Accuracy Inflation from Leakage: <strong>{best_f['Balanced Accuracy'] - best_nl['Balanced Accuracy']:+.2%}</strong></h4>
-    </div>
-    """, unsafe_allow_html=True)
-    col_c1, col_c2 = st.columns(2)
-    with col_c1: st.plotly_chart(viz.plot_misleading_accuracy(ckd_pct), use_container_width=True, key="mis")
-    with col_c2: st.plotly_chart(viz.plot_precision_recall_f1(res_nl), use_container_width=True, key="pr_f1")
-    st.plotly_chart(viz.plot_age_distribution(df_sample), use_container_width=True, key="age_dist")
+if t_comp:
+    with t_comp:
+        st.header("Performance Drop Comparison")
+        best_f = res_f.iloc[0]
+        best_nl = res_nl.iloc[0]
+        st.markdown(f"""
+        <div class='metric-card'>
+        <h4>Accuracy Inflation from Leakage: <strong>{best_f['Balanced Accuracy'] - best_nl['Balanced Accuracy']:+.2%}</strong></h4>
+        </div>
+        """, unsafe_allow_html=True)
+        col_c1, col_c2 = st.columns(2)
+        with col_c1: st.plotly_chart(viz.plot_misleading_accuracy(ckd_pct), use_container_width=True, key="mis")
+        with col_c2: st.plotly_chart(viz.plot_precision_recall_f1(res_nl), use_container_width=True, key="pr_f1")
+        st.plotly_chart(viz.plot_age_distribution(df_sample), use_container_width=True, key="age_dist")
 
 # --- TAB 5: SMOTE INSIGHTS ---
-with tabs[4]:
-    st.header("🧬 SMOTE Impact Analysis")
-    st.info("SMOTE (Synthetic Minority Over-sampling Technique) creates artificial samples to balance the dataset. In our CKD case (92/8 split), it targets the 'Healthy' minority.")
-    
-    # Side-by-side comparison
-    col_s1, col_s2 = st.columns(2)
-    with col_s1:
-        st.subheader("Results WITH SMOTE")
-        st.dataframe(res_nl[['Model', 'Balanced Accuracy', 'Macro F1', 'Macro Recall']].head(5), use_container_width=True)
-    with col_s2:
-        st.subheader("Results WITHOUT SMOTE")
-        st.dataframe(res_no_smote[['Model', 'Balanced Accuracy', 'Macro F1', 'Macro Recall']].head(5), use_container_width=True)
+if t_smote:
+    with t_smote:
+        st.header("🧬 SMOTE Impact Analysis")
+        st.info("SMOTE (Synthetic Minority Over-sampling Technique) creates artificial samples to balance the dataset. In our CKD case (92/8 split), it targets the 'Healthy' minority.")
+        
+        # Side-by-side comparison
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            st.subheader("Results WITH SMOTE")
+            st.dataframe(res_nl[['Model', 'Balanced Accuracy', 'Macro F1', 'Macro Recall']].head(5), use_container_width=True)
+        with col_s2:
+            st.subheader("Results WITHOUT SMOTE")
+            st.dataframe(res_no_smote[['Model', 'Balanced Accuracy', 'Macro F1', 'Macro Recall']].head(5), use_container_width=True)
 
-    st.markdown("---")
-    st.subheader("🔍 Why do metrics fall after SMOTE?")
-    
-    sc1, sc2 = st.columns(2)
-    with sc1:
-        st.markdown(f"""
-        <div class='glass-card'>
-        <h4>1. The Accuracy Trap</h4>
-        <p>With a 92% majority class, a model that guesses 'Sick' for everyone is 92% accurate but useless. SMOTE forces the model to learn the harder 8% (Healthy), which naturally drops the 'easy' accuracy score.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown(f"""
-        <div class='glass-card'>
-        <h4>2. Redundancy</h4>
-        <p>Your models already use <strong>class_weight='balanced'</strong>. Adding SMOTE on top can be overkill, making the model over-sensitive to the minority class and increasing False Positives.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with sc2:
-        st.markdown(f"""
-        <div class='glass-card'>
-        <h4>3. Boundary Blurring</h4>
-        <p>SMOTE creates points by drawing lines between existing ones. If Healthy and Sick patients have overlapping features, SMOTE creates 'synthetic noise' in the overlap, confusing the model.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown(f"""
-        <div class='glass-card'>
-        <h4>4. The Trade-off</h4>
-        <p>SMOTE is used to improve <strong>Minority Recall</strong> (finding healthy people). We often accept a drop in Precision or Accuracy to ensure the model isn't just ignoring the minority group.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("---")
+        st.subheader("🔍 Why do metrics fall after SMOTE?")
+        
+        sc1, sc2 = st.columns(2)
+        with sc1:
+            st.markdown(f"""
+            <div class='glass-card'>
+            <h4>1. The Accuracy Trap</h4>
+            <p>With a 92% majority class, a model that guesses 'Sick' for everyone is 92% accurate but useless. SMOTE forces the model to learn the harder 8% (Healthy), which naturally drops the 'easy' accuracy score.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class='glass-card'>
+            <h4>2. Redundancy</h4>
+            <p>Your models already use <strong>class_weight='balanced'</strong>. Adding SMOTE on top can be overkill, making the model over-sensitive to the minority class and increasing False Positives.</p>
+            </div>
+            """, unsafe_allow_html=True)
+        with sc2:
+            st.markdown(f"""
+            <div class='glass-card'>
+            <h4>3. Boundary Blurring</h4>
+            <p>SMOTE creates points by drawing lines between existing ones. If Healthy and Sick patients have overlapping features, SMOTE creates 'synthetic noise' in the overlap, confusing the model.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class='glass-card'>
+            <h4>4. The Trade-off</h4>
+            <p>SMOTE is used to improve <strong>Minority Recall</strong> (finding healthy people). We often accept a drop in Precision or Accuracy to ensure the model isn't just ignoring the minority group.</p>
+            </div>
+            """, unsafe_allow_html=True)
 
 # --- TAB 6: THRESHOLD ---
-with tabs[5]:
-    st.header("Decision Threshold Optimization")
-    th_df, _ = trainer.tune_threshold(y_te_f, y_proba_all)
-    st.plotly_chart(viz.plot_threshold_tuning(th_df, best_th), use_container_width=True, key="th_tune")
-    # Interactive threshold slider
-    user_th = st.slider("Adjust Threshold", 0.05, 0.95, float(best_th), 0.05, key="th_slider")
-    from sklearn.metrics import balanced_accuracy_score, f1_score, precision_score, recall_score
-    y_at_th = (y_proba_all >= user_th).astype(int)
-    tc1, tc2, tc3, tc4 = st.columns(4)
-    with tc1: st.metric("Balanced Acc", f"{balanced_accuracy_score(y_te_f, y_at_th):.2%}")
-    with tc2: st.metric("Precision", f"{precision_score(y_te_f, y_at_th, zero_division=0):.2%}")
-    with tc3: st.metric("Recall", f"{recall_score(y_te_f, y_at_th, zero_division=0):.2%}")
-    with tc4: st.metric("Macro F1", f"{f1_score(y_te_f, y_at_th, average='macro', zero_division=0):.2%}")
-    if st.button("Run Sanity Check"):
-        acc = trainer.run_sanity_check(trained_nl[best_name], X_te_nl, y_te_f)
-        st.metric("Shuffled Balanced Accuracy", f"{acc:.2%}")
+if t_th:
+    with t_th:
+        st.header("Decision Threshold Optimization")
+        th_df, _ = trainer.tune_threshold(y_te_f, y_proba_all)
+        st.plotly_chart(viz.plot_threshold_tuning(th_df, best_th), use_container_width=True, key="th_tune")
+        # Interactive threshold slider
+        user_th = st.slider("Adjust Threshold", 0.05, 0.95, float(best_th), 0.05, key="th_slider")
+        from sklearn.metrics import balanced_accuracy_score, f1_score, precision_score, recall_score
+        y_at_th = (y_proba_all >= user_th).astype(int)
+        tc1, tc2, tc3, tc4 = st.columns(4)
+        with tc1: st.metric("Balanced Acc", f"{balanced_accuracy_score(y_te_f, y_at_th):.2%}")
+        with tc2: st.metric("Precision", f"{precision_score(y_te_f, y_at_th, zero_division=0):.2%}")
+        with tc3: st.metric("Recall", f"{recall_score(y_te_f, y_at_th, zero_division=0):.2%}")
+        with tc4: st.metric("Macro F1", f"{f1_score(y_te_f, y_at_th, average='macro', zero_division=0):.2%}")
+        if st.button("Run Sanity Check"):
+            acc = trainer.run_sanity_check(trained_nl[best_name], X_te_nl, y_te_f)
+            st.metric("Shuffled Balanced Accuracy", f"{acc:.2%}")
 
 # --- TAB 7: SHAP ---
-with tabs[6]:
-    st.header("🧠 Model Interpretation (SHAP)")
-    with st.spinner("Calculating Global SHAP..."):
-        X_test_df = pd.DataFrame(X_te_nl.values, columns=X_te_nl.columns).reset_index(drop=True)
-        explainer, shap_values, X_df = trainer.get_shap_explainer(trained_nl[best_name], X_test_df)
-    cs1, cs2 = st.columns(2)
-    with cs1: st.pyplot(viz.plot_shap_bar(explainer, shap_values, X_df, best_name))
-    with cs2: st.pyplot(viz.plot_shap_summary(explainer, shap_values, X_df, best_name))
-    # Grouped SHAP
-    st.subheader("Risk Factor Group Contributions")
-    group_imp = trainer.get_grouped_shap(shap_values, X_df.columns)
-    st.plotly_chart(viz.plot_grouped_shap(group_imp), use_container_width=True, key="grp_shap")
+if t_shap:
+    with t_shap:
+        st.header("🧠 Model Interpretation (SHAP)")
+        with st.spinner("Calculating Global SHAP..."):
+            X_test_df = pd.DataFrame(X_te_nl.values, columns=X_te_nl.columns).reset_index(drop=True)
+            explainer, shap_values, X_df = trainer.get_shap_explainer(trained_nl[best_name], X_test_df)
+        cs1, cs2 = st.columns(2)
+        with cs1: st.pyplot(viz.plot_shap_bar(explainer, shap_values, X_df, best_name))
+        with cs2: st.pyplot(viz.plot_shap_summary(explainer, shap_values, X_df, best_name))
+        # Grouped SHAP
+        st.subheader("Risk Factor Group Contributions")
+        group_imp = trainer.get_grouped_shap(shap_values, X_df.columns)
+        st.plotly_chart(viz.plot_grouped_shap(group_imp), use_container_width=True, key="grp_shap")
 
 # --- TAB 8: DEEP ANALYSIS ---
-with tabs[7]:
-    st.header("🔬 Deep Analysis")
+if t_deep:
+    with t_deep:
+        st.header("🔬 Deep Analysis")
 
-    # 1. Feature Direction
-    st.subheader("1. What Differentiates CKD Patients?")
-    st.plotly_chart(viz.plot_feature_direction(df_sample), use_container_width=True, key="feat_dir")
+        # 1. Feature Direction
+        st.subheader("1. What Differentiates CKD Patients?")
+        st.plotly_chart(viz.plot_feature_direction(df_sample), use_container_width=True, key="feat_dir")
 
-    # 2. Calibration Curve
-    st.subheader("2. Calibration — Is Your Probability Trustworthy?")
-    st.plotly_chart(viz.plot_calibration(y_te_f, y_proba_all), use_container_width=True, key="calib")
+        # 2. Calibration Curve
+        st.subheader("2. Calibration — Is Your Probability Trustworthy?")
+        st.plotly_chart(viz.plot_calibration(y_te_f, y_proba_all), use_container_width=True, key="calib")
 
-    # 3. Error Analysis
-    st.subheader("3. Error Analysis — Where Does the Model Fail?")
-    err_data = trainer.get_error_analysis(trained_nl[best_name], X_te_nl, y_te_f)
-    ec1, ec2 = st.columns(2)
-    with ec1:
-        st.plotly_chart(viz.plot_confusion_matrix(err_data["counts"]), use_container_width=True, key="cm2")
-    with ec2:
-        c = err_data["counts"]
-        st.markdown(f"""
-        <div class='glass-card'>
-        <h4>📋 Error Breakdown</h4>
-        <p>✅ True Positives: <strong>{c['TP']}</strong> — Correctly identified CKD</p>
-        <p>✅ True Negatives: <strong>{c['TN']}</strong> — Correctly ruled out CKD</p>
-        <p>⚠️ False Positives: <strong>{c['FP']}</strong> — Healthy flagged as CKD</p>
-        <p>🚨 False Negatives: <strong>{c['FN']}</strong> — Missed CKD cases</p>
-        </div>
-        """, unsafe_allow_html=True)
-    st.plotly_chart(viz.plot_error_patterns(err_data["fp_data"], err_data["fn_data"], X_te_nl),
-                    use_container_width=True, key="err_pat")
+        # 3. Error Analysis
+        st.subheader("3. Error Analysis — Where Does the Model Fail?")
+        err_data = trainer.get_error_analysis(trained_nl[best_name], X_te_nl, y_te_f)
+        ec1, ec2 = st.columns(2)
+        with ec1:
+            st.plotly_chart(viz.plot_confusion_matrix(err_data["counts"]), use_container_width=True, key="cm2")
+        with ec2:
+            c = err_data["counts"]
+            st.markdown(f"""
+            <div class='glass-card'>
+            <h4>📋 Error Breakdown</h4>
+            <p>✅ True Positives: <strong>{c['TP']}</strong> — Correctly identified CKD</p>
+            <p>✅ True Negatives: <strong>{c['TN']}</strong> — Correctly ruled out CKD</p>
+            <p>⚠️ False Positives: <strong>{c['FP']}</strong> — Healthy flagged as CKD</p>
+            <p>🚨 False Negatives: <strong>{c['FN']}</strong> — Missed CKD cases</p>
+            </div>
+            """, unsafe_allow_html=True)
+        st.plotly_chart(viz.plot_error_patterns(err_data["fp_data"], err_data["fn_data"], X_te_nl),
+                        use_container_width=True, key="err_pat")
 
-    # 4. Population Risk Distribution
-    st.subheader("4. Population Risk Distribution")
-    st.plotly_chart(viz.plot_population_risk(y_proba_all), use_container_width=True, key="pop_risk")
+        # 4. Population Risk Distribution
+        st.subheader("4. Population Risk Distribution")
+        st.plotly_chart(viz.plot_population_risk(y_proba_all), use_container_width=True, key="pop_risk")
 
-    # 5. Model Stability
-    st.subheader("5. Model Stability Across Splits")
-    if st.button("🔄 Run Stability Check (5 splits)", key="stab_btn"):
-        with st.spinner("Running 5 cross-validation splits..."):
-            # Reconstruct full no-leakage data for stability
-            leakage_cols = ["GFR", "SerumCreatinine", "BUNLevels", "ProteinInUrine", "ACR"]
-            X_full_nl = pd.concat([X_tr_nl, X_te_nl]).reset_index(drop=True)
-            y_full = pd.concat([y_tr_f, y_te_f]).reset_index(drop=True)
-            scores = trainer.run_stability_check_multi(X_full_nl, y_full, n_runs=5)
-        st.plotly_chart(viz.plot_model_stability(scores), use_container_width=True, key="stab")
-        st.markdown(f"""
-        <div class='glass-card'>
-        <h4>📊 Stability Summary</h4>
-        <p>Mean: <strong>{np.mean(scores):.4f}</strong> | Std: <strong>{np.std(scores):.4f}</strong></p>
-        <p>{'✅ Model is stable across splits' if np.std(scores) < 0.02 else '⚠️ Some variance detected'}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        # 5. Model Stability
+        st.subheader("5. Model Stability Across Splits")
+        if st.button("🔄 Run Stability Check (5 splits)", key="stab_btn"):
+            with st.spinner("Running 5 cross-validation splits..."):
+                # Reconstruct full no-leakage data for stability
+                leakage_cols = ["GFR", "SerumCreatinine", "BUNLevels", "ProteinInUrine", "ACR"]
+                X_full_nl = pd.concat([X_tr_nl, X_te_nl]).reset_index(drop=True)
+                y_full = pd.concat([y_tr_f, y_te_f]).reset_index(drop=True)
+                scores = trainer.run_stability_check_multi(X_full_nl, y_full, n_runs=5)
+            st.plotly_chart(viz.plot_model_stability(scores), use_container_width=True, key="stab")
+            st.markdown(f"""
+            <div class='glass-card'>
+            <h4>📊 Stability Summary</h4>
+            <p>Mean: <strong>{np.mean(scores):.4f}</strong> | Std: <strong>{np.std(scores):.4f}</strong></p>
+            <p>{'✅ Model is stable across splits' if np.std(scores) < 0.02 else '⚠️ Some variance detected'}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
 # --- TAB 9: DIAGNOSIS ---
-with tabs[8]:
+with t_diag:
     st.header("🏥 Precision Patient Diagnosis")
     st.info("Fill in the clinical details below. Features not specified will be set to the population average.")
     
