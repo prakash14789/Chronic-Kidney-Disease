@@ -42,6 +42,37 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
+# --- LOGIN SYSTEM ---
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
+
+def login_page():
+    # Center the login form
+    col1, col2, col3 = st.columns([1, 1.5, 1])
+    with col2:
+        st.markdown("""
+            <div style='background-color: #1e293b; padding: 30px; border-radius: 10px; border: 1px solid #334155; margin-top: 50px; margin-bottom: 20px;'>
+                <h2 style='text-align: center; color: #38bdf8;'>🔐 Clinical Portal Login</h2>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        with st.form("login_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            submit = st.form_submit_button("Login", use_container_width=True)
+            
+            if submit:
+                if username == "admin" and password == "admin":
+                    st.session_state['logged_in'] = True
+                    st.success("Access Granted!")
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password")
+
+if not st.session_state['logged_in']:
+    login_page()
+    st.stop()
+
 # Initialize
 processor = CKDDataProcessor()
 trainer = CKDModelTrainer()
