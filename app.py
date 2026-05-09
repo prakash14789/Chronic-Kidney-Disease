@@ -121,6 +121,11 @@ with st.sidebar:
     st.divider()
     st.markdown("[🔗 View Source on GitHub](https://github.com/prakash14789/Chronic-Kidney-Disease)")
     st.success("v3 Research Pipeline Active")
+    st.divider()
+    if st.button("🚪 Logout", use_container_width=True):
+        st.session_state['logged_in'] = False
+        st.session_state['role'] = None
+        st.rerun()
 
 # --- PIPELINE EXECUTION ---
 @st.cache_data
