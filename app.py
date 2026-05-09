@@ -10,35 +10,61 @@ from report_generator import CKDReportGenerator
 # Page Config
 st.set_page_config(page_title="CKD Clinical Intelligence v3.2", page_icon="🧬", layout="wide")
 
-# Custom Styles
+# Custom Styles with Theme Toggle
+theme = st.sidebar.selectbox("🎨 Theme", ["Premium Dark (Glass)", "Clinical Light"], index=0)
+
+if theme == "Clinical Light":
+    COLORS["bg"] = "#F8FAFC"
+    COLORS["text"] = "#0F172A"
+    COLORS["grid"] = "#E2E8F0"
+    COLORS["primary"] = "#2563EB"
+    COLORS["secondary"] = "#1D4ED8"
+    COLORS["accent"] = "#1E40AF"
+    
+    bg_color = COLORS["bg"]
+    text_color = COLORS["text"]
+    card_bg = "rgba(255, 255, 255, 0.9)"
+    border_color = "rgba(0, 0, 0, 0.1)"
+    accent_color = COLORS["primary"]
+else:
+    bg_color = COLORS["bg"]
+    text_color = COLORS["text"]
+    card_bg = "rgba(30, 41, 59, 0.7)"
+    border_color = "rgba(255, 255, 255, 0.08)"
+    accent_color = COLORS["primary"]
+
 st.markdown(f"""
     <style>
-    .stApp {{ background-color: {COLORS["bg"]}; color: {COLORS["text"]}; }}
-    .stTabs [aria-selected="true"] {{ background-color: {COLORS["primary"]} !important; color: white !important; }}
+    .stApp {{ background-color: {bg_color}; color: {text_color}; }}
+    .stTabs [aria-selected="true"] {{ background-color: {accent_color} !important; color: white !important; }}
     .metric-card {{ 
-        background: linear-gradient(135deg, #1e293b 0%, {COLORS["bg"]} 100%); 
-        color: {COLORS["text"]} !important; padding: 20px; border-radius: 12px; 
-        border-left: 6px solid {COLORS["primary"]}; margin-bottom: 20px;
-        border: 1px solid {COLORS["grid"]};
+        background: {card_bg}; 
+        backdrop-filter: blur(12px);
+        color: {text_color} !important; padding: 20px; border-radius: 12px; 
+        border-left: 6px solid {accent_color}; margin-bottom: 20px;
+        border: 1px solid {border_color};
     }}
-    .metric-card h4, .metric-card p {{ color: {COLORS["text"]} !important; margin: 0; }}
+    .metric-card h4, .metric-card p {{ color: {text_color} !important; margin: 0; }}
     .prediction-box {{
-        background-color: {COLORS["grid"]}; padding: 20px; border-radius: 10px;
-        text-align: center; border: 2px solid {COLORS["primary"]}; color: {COLORS["text"]};
+        background-color: {card_bg}; padding: 20px; border-radius: 10px;
+        text-align: center; border: 2px solid {accent_color}; color: {text_color};
     }}
     .glass-card {{
-        background: rgba(30,41,59,0.7); backdrop-filter: blur(12px);
-        border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;
+        background: {card_bg}; backdrop-filter: blur(12px);
+        border: 1px solid {border_color}; border-radius: 16px;
         padding: 24px; margin-bottom: 16px;
+        color: {text_color};
     }}
     .kpi-row {{ display: flex; gap: 16px; margin-bottom: 24px; }}
     .kpi-box {{
-        flex: 1; background: linear-gradient(135deg, #1e293b, #0E1117);
+        flex: 1; background: {card_bg};
+        backdrop-filter: blur(12px);
         border-radius: 14px; padding: 20px; text-align: center;
-        border: 1px solid {COLORS["grid"]};
+        border: 1px solid {border_color};
+        color: {text_color};
     }}
-    .kpi-box h2 {{ color: {COLORS["primary"]}; margin: 0; font-size: 2rem; }}
-    .kpi-box p {{ color: {COLORS["text"]}; margin: 4px 0 0 0; font-size: 0.85rem; }}
+    .kpi-box h2 {{ color: {accent_color}; margin: 0; font-size: 2rem; }}
+    .kpi-box p {{ color: {text_color}; margin: 4px 0 0 0; font-size: 0.85rem; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -148,12 +174,12 @@ with k4: st.metric("📊 Dataset Size", f"{len(df_full):,} → {sample_size}")
 if st.session_state['role'] == "admin":
     tabs = st.tabs([
         "📊 Data Audit", "🚀 Exp 1 (Full)", "🛡️ Exp 2 (No-Leakage)", "📉 Comparison",
-        "🧬 SMOTE Insights", "🎯 Threshold Tuning", "🧠 SHAP Interpretation", "🔬 Deep Analysis", "🏥 Patient Diagnosis"
+        "🧬 SMOTE Insights", "🎯 Threshold Tuning", "🧠 SHAP Interpretation", "🔬 Deep Analysis", "🏥 Patient Diagnosis", "📂 Batch Diagnosis"
     ])
-    t_audit, t_exp1, t_exp2, t_comp, t_smote, t_th, t_shap, t_deep, t_diag = tabs
+    t_audit, t_exp1, t_exp2, t_comp, t_smote, t_th, t_shap, t_deep, t_diag, t_batch = tabs
 else:
-    tabs = st.tabs(["🏥 Patient Diagnosis"])
-    t_diag = tabs[0]
+    tabs = st.tabs(["🏥 Patient Diagnosis", "📂 Batch Diagnosis"])
+    t_diag, t_batch = tabs
     t_audit = t_exp1 = t_exp2 = t_comp = t_smote = t_th = t_shap = t_deep = None
 
 # --- TAB 1: DATA AUDIT ---
@@ -493,6 +519,67 @@ with t_diag:
         # SHAP Waterfall
         st.subheader("📊 Feature Contribution Analysis")
         st.pyplot(viz.plot_local_shap(explainer, shap_values, X_df, patient_idx=0))
+
+# --- TAB 10: BATCH DIAGNOSIS ---
+if t_batch:
+    with t_batch:
+        st.header("📂 Batch Patient Diagnosis")
+        st.info("Upload a CSV file containing patient data. The system will predict the risk for all patients.")
+        
+        uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
+        if uploaded_file is not None:
+            try:
+                import pandas as pd
+                import plotly.express as px
+                
+                batch_df = pd.read_csv(uploaded_file)
+                st.success(f"Loaded {len(batch_df)} patients.")
+                
+                # We need to ensure the columns match X_te_nl.columns
+                missing_cols = [c for c in X_te_nl.columns if c not in batch_df.columns]
+                if missing_cols:
+                    st.warning(f"The following required columns are missing and will be filled with population means: {missing_cols}")
+                    for c in missing_cols:
+                        batch_df[c] = X_te_nl[c].mean()
+                
+                # Ensure correct order and handle extra columns
+                X_batch = batch_df[X_te_nl.columns]
+                
+                # Run predictions
+                probs = trained_nl[best_name].predict_proba(X_batch)[:, 1]
+                preds = (probs >= best_th).astype(int)
+                
+                # Add results to dataframe
+                batch_df["CKD_Risk_Score"] = probs
+                batch_df["CKD_Prediction"] = preds
+                batch_df["Risk_Level"] = [trainer.get_clinical_assessment(p)["Level"] for p in probs]
+                
+                # Show results
+                st.dataframe(batch_df, use_container_width=True)
+                
+                # Summary plots
+                col1, col2 = st.columns(2)
+                with col1:
+                    fig = px.pie(batch_df, names="Risk_Level", title="Risk Level Distribution",
+                                 color="Risk_Level",
+                                 color_discrete_map={"Low Risk": "#4D96FF", "Moderate Risk": "#FFD93D", "High Risk": "#FF6B6B"})
+                    st.plotly_chart(fig, use_container_width=True)
+                with col2:
+                    fig = px.histogram(batch_df, x="CKD_Risk_Score", title="Risk Score Distribution",
+                                       nbinsx=20, color_discrete_sequence=["#4361EE"])
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Download button
+                csv = batch_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Download Predictions CSV",
+                    data=csv,
+                    file_name="ckd_batch_predictions.csv",
+                    mime="text/csv",
+                )
+                
+            except Exception as e:
+                st.error(f"Error processing file: {e}")
 
 st.markdown("---")
 st.caption("CKD Intelligence v3.2 — Precision Research Dashboard.")
