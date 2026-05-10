@@ -35,36 +35,120 @@ else:
 
 st.markdown(f"""
     <style>
-    .stApp {{ background-color: {bg_color}; color: {text_color}; }}
-    .stTabs [aria-selected="true"] {{ background-color: {accent_color} !important; color: white !important; }}
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+
+    html, body, [class*="css"], .stApp {{
+        font-family: 'Outfit', sans-serif !important;
+    }}
+
+    .stApp {{ 
+        background: radial-gradient(circle at top left, #1e293b, {bg_color}); 
+        color: {text_color}; 
+    }}
+    
+    .stTabs [aria-selected="true"] {{ 
+        background: linear-gradient(135deg, {accent_color} 0%, #1D4ED8 100%) !important; 
+        color: white !important; 
+        border-radius: 8px !important;
+    }}
+    
+    .stTabs [data-baseweb="tab"] {{
+        border-radius: 8px 8px 0 0 !important;
+        margin-right: 4px !important;
+    }}
+
     .metric-card {{ 
         background: {card_bg}; 
-        backdrop-filter: blur(12px);
-        color: {text_color} !important; padding: 20px; border-radius: 12px; 
-        border-left: 6px solid {accent_color}; margin-bottom: 20px;
-        border: 1px solid {border_color};
+        backdrop-filter: blur(16px) saturate(180%);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        color: {text_color} !important; 
+        padding: 24px; 
+        border-radius: 16px; 
+        border-left: 5px solid {accent_color}; 
+        margin-bottom: 20px;
+        border-top: 1px solid {border_color};
+        border-right: 1px solid {border_color};
+        border-bottom: 1px solid {border_color};
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }}
+    
+    .metric-card:hover {{
+        transform: translateY(-5px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+        border-color: rgba(67, 97, 238, 0.3);
+    }}
+
     .metric-card h4, .metric-card p {{ color: {text_color} !important; margin: 0; }}
+    
     .prediction-box {{
-        background-color: {card_bg}; padding: 20px; border-radius: 10px;
-        text-align: center; border: 2px solid {accent_color}; color: {text_color};
-    }}
-    .glass-card {{
-        background: {card_bg}; backdrop-filter: blur(12px);
-        border: 1px solid {border_color}; border-radius: 16px;
-        padding: 24px; margin-bottom: 16px;
+        background-color: {card_bg}; 
+        padding: 24px; 
+        border-radius: 16px;
+        text-align: center; 
+        border: 2px solid {accent_color}; 
         color: {text_color};
+        box-shadow: 0 0 15px rgba(67, 97, 238, 0.2);
     }}
+    
+    .glass-card {{
+        background: {card_bg}; 
+        backdrop-filter: blur(16px) saturate(180%);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        border: 1px solid {border_color}; 
+        border-radius: 16px;
+        padding: 24px; 
+        margin-bottom: 16px;
+        color: {text_color};
+        transition: all 0.3s ease;
+    }}
+    
+    .glass-card:hover {{
+        border-color: rgba(67, 97, 238, 0.3);
+        box-shadow: 0 8px 12px -1px rgba(0, 0, 0, 0.1);
+    }}
+
     .kpi-row {{ display: flex; gap: 16px; margin-bottom: 24px; }}
+    
     .kpi-box {{
-        flex: 1; background: {card_bg};
-        backdrop-filter: blur(12px);
-        border-radius: 14px; padding: 20px; text-align: center;
+        flex: 1; 
+        background: {card_bg};
+        backdrop-filter: blur(16px) saturate(180%);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        border-radius: 16px; 
+        padding: 24px; 
+        text-align: center;
         border: 1px solid {border_color};
         color: {text_color};
+        transition: all 0.3s ease;
     }}
-    .kpi-box h2 {{ color: {accent_color}; margin: 0; font-size: 2rem; }}
-    .kpi-box p {{ color: {text_color}; margin: 4px 0 0 0; font-size: 0.85rem; }}
+    
+    .kpi-box:hover {{
+        transform: translateY(-3px);
+        border-color: rgba(67, 97, 238, 0.3);
+    }}
+
+    .kpi-box h2 {{ color: {accent_color}; margin: 0; font-size: 2.2rem; font-weight: 700; }}
+    .kpi-box p {{ color: {text_color}; margin: 6px 0 0 0; font-size: 0.9rem; opacity: 0.8; }}
+    
+    .stButton>button {{
+        background: linear-gradient(135deg, {accent_color} 0%, #1D4ED8 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+    }}
+    
+    .stButton>button:hover {{
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(67, 97, 238, 0.3) !important;
+    }}
+    
+    [data-testid="stSidebar"] {{
+        background-color: #0f172a !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -78,8 +162,10 @@ def login_page():
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
         st.markdown("""
-            <div style='background-color: #1e293b; padding: 30px; border-radius: 10px; border: 1px solid #334155; margin-top: 50px; margin-bottom: 20px;'>
-                <h2 style='text-align: center; color: #38bdf8;'>🔐 Clinical Portal Login</h2>
+            <div style='background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(16px); padding: 30px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); margin-top: 50px; margin-bottom: 20px; text-align: center;'>
+                <span style='font-size: 3rem;'>🧬</span>
+                <h2 style='color: #f8fafc; margin-top: 10px; font-weight: 700; letter-spacing: -0.05em;'>Clinical Portal</h2>
+                <p style='color: #94a3b8; font-size: 0.9rem;'>Chronic Kidney Disease Intelligence</p>
             </div>
         """, unsafe_allow_html=True)
         
@@ -169,12 +255,29 @@ y_proba_all = trained_nl[best_name].predict_proba(X_te_nl)[:, 1]
 ckd_pct = df_full['Diagnosis'].mean() * 100
 
 # --- KPI CARDS ---
-st.title("CKD Clinical Intelligence Dashboard")
-k1, k2, k3, k4 = st.columns(4)
-with k1: st.metric("🏆 Best Model", best_name)
-with k2: st.metric("🎯 Balanced Accuracy", f"{res_nl.iloc[0]['Balanced Accuracy']:.2%}")
-with k3: st.metric("📈 ROC-AUC", f"{res_nl.iloc[0]['ROC-AUC']:.4f}")
-with k4: st.metric("📊 Dataset Size", f"{len(df_full):,} → {sample_size}")
+st.markdown("<h1 style='text-align: center; margin-bottom: 30px; font-weight: 800; letter-spacing: -0.05em;'>🧬 CKD Clinical Intelligence</h1>", unsafe_allow_html=True)
+
+st.markdown(f"""
+<div class='kpi-row'>
+    <div class='kpi-box'>
+        <p>🏆 Best Model</p>
+        <h2>{best_name}</h2>
+    </div>
+    <div class='kpi-box'>
+        <p>🎯 Balanced Accuracy</p>
+        <h2>{res_nl.iloc[0]['Balanced Accuracy']:.2%}</h2>
+    </div>
+    <div class='kpi-box'>
+        <p>📈 ROC-AUC</p>
+        <h2>{res_nl.iloc[0]['ROC-AUC']:.4f}</h2>
+    </div>
+    <div class='kpi-box'>
+        <p>📊 Dataset Size</p>
+        <h2>{len(df_full):,}</h2>
+        <p style='font-size: 0.8rem; opacity: 0.6;'>Sampled to {sample_size}</p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 if st.session_state['role'] == "admin":
     tabs = st.tabs([
@@ -461,7 +564,7 @@ with t_diag:
             st.plotly_chart(viz.plot_risk_gauge(prob), use_container_width=True, key="gauge")
         with col_r:
             st.markdown(f"""
-                <div class='metric-card' style='border-left: 6px solid {assessment["Color"]};'>
+                <div class='metric-card' style='border-left: 6px solid {assessment["Color"]}; box-shadow: 0 4px 15px {assessment["Color"]}20;'>
                     <h4>{assessment["Icon"]} {assessment["Level"]} — {prob:.1%} Risk</h4>
                     <p style='font-size: 1.1rem; margin-top: 10px;'>{assessment["Action"]}</p>
                     <p style='font-size: 0.9rem; color: #94a3b8; margin-top: 15px;'>
