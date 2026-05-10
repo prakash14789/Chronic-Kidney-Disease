@@ -366,6 +366,8 @@ By default, if the AI says "probability > 50%", we classify as CKD. But maybe 40
 
 ## 8. The Dashboard — What the User Sees
 
+![CKD Dashboard](assets/screenshot.png)
+
 The dashboard has **8 tabs**, each serving a specific purpose:
 
 ### Tab 1: 📊 Data Audit
