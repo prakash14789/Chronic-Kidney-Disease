@@ -7,3 +7,5 @@ __pycache__/
 model_comparison.csv
 model_comparison_no_leakage.csv
 *.png
+saved_models/
+reports/

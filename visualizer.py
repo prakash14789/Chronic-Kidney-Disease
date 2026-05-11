@@ -359,3 +359,183 @@ class CKDVisualizer:
         fig.update_layout(title="Error Pattern Analysis (% Deviation from Population Mean)",
                           xaxis_title="Feature", yaxis_title="% Deviation", barmode="group")
         return CKDVisualizer._apply_dark_theme(fig)
+
+    # ── CKD STAGE PREDICTION VISUALIZATIONS ───────────────────
+
+    @staticmethod
+    def plot_stage_distribution(stage_dist):
+        """Donut chart of CKD stage distribution in dataset."""
+        stage_colors = {1: "#4D96FF", 2: "#4CC9F0", 3: "#FFD93D", 4: "#FF9F1C", 5: "#FF6B6B"}
+        labels = [f"Stage {k}" for k in stage_dist.keys()]
+        values = list(stage_dist.values())
+        colors = [stage_colors.get(k, "#888") for k in stage_dist.keys()]
+
+        fig = go.Figure(data=[go.Pie(
+            labels=labels, values=values, hole=0.45,
+            marker=dict(colors=colors, line=dict(color=COLORS["bg"], width=2)),
+            textinfo='percent+label', textfont_size=12
+        )])
+        fig.update_layout(title="CKD Stage Distribution in Dataset")
+        return CKDVisualizer._apply_dark_theme(fig)
+
+    @staticmethod
+    def plot_stage_prediction_bar(stage_probs, predicted_stage):
+        """Bar chart showing probability of each CKD stage for a patient."""
+        stage_colors = {1: "#4D96FF", 2: "#4CC9F0", 3: "#FFD93D", 4: "#FF9F1C", 5: "#FF6B6B"}
+        stages = sorted(stage_probs.keys())
+        probs = [stage_probs[s] for s in stages]
+        colors = [stage_colors.get(s, "#888") for s in stages]
+        borders = ["white" if s == predicted_stage else "rgba(0,0,0,0)" for s in stages]
+
+        fig = go.Figure(go.Bar(
+            x=[f"Stage {s}" for s in stages], y=probs,
+            marker_color=colors,
+            marker_line_color=borders, marker_line_width=3,
+            text=[f"{p:.1%}" for p in probs], textposition='auto'
+        ))
+        fig.update_layout(title=f"Stage Probability Distribution (Predicted: Stage {predicted_stage})",
+                          yaxis_title="Probability", yaxis_range=[0, 1])
+        return CKDVisualizer._apply_dark_theme(fig)
+
+    @staticmethod
+    def plot_stage_confusion(y_test, y_pred):
+        """Multi-class confusion matrix heatmap for CKD stages."""
+        from sklearn.metrics import confusion_matrix as cm_func
+        labels = sorted(list(set(y_test) | set(y_pred)))
+        cm = cm_func(y_test, y_pred, labels=labels)
+        stage_labels = [f"Stage {l}" for l in labels]
+
+        fig = go.Figure(data=go.Heatmap(
+            z=cm, x=stage_labels, y=stage_labels,
+            texttemplate="%{z}", showscale=True,
+            colorscale=[[0, COLORS["grid"]], [0.5, COLORS["primary"]], [1, "#4CC9F0"]]
+        ))
+        fig.update_layout(title="Stage Prediction Confusion Matrix",
+                          xaxis_title="Predicted Stage", yaxis_title="Actual Stage")
+        return CKDVisualizer._apply_dark_theme(fig)
+
+    # ── OPTUNA VISUALIZATION ──────────────────────────────────
+
+    @staticmethod
+    def plot_optuna_history(results):
+        """Optimization history for all tuned models."""
+        fig = go.Figure()
+        colors = ["#4CC9F0", "#F72585", "#4361EE", "#FFD93D"]
+        for i, (name, data) in enumerate(results.items()):
+            history = data['optimization_history']
+            trials = [h[0] for h in history]
+            values = [h[1] for h in history]
+            # Running best
+            running_best = []
+            best_so_far = 0
+            for v in values:
+                best_so_far = max(best_so_far, v)
+                running_best.append(best_so_far)
+            fig.add_trace(go.Scatter(
+                x=trials, y=running_best, name=f"{name} (Best: {data['best_score']:.4f})",
+                mode='lines+markers', line=dict(color=colors[i % len(colors)], width=2),
+                marker=dict(size=4)
+            ))
+        fig.update_layout(title="Optuna Optimization History (Running Best)",
+                          xaxis_title="Trial", yaxis_title="Balanced Accuracy")
+        return CKDVisualizer._apply_dark_theme(fig)
+
+    @staticmethod
+    def plot_optuna_comparison(results, default_scores):
+        """Before vs After tuning comparison."""
+        models = list(results.keys())
+        tuned = [results[m]['best_score'] for m in models]
+        defaults = [default_scores.get(m, 0) for m in models]
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(name="Default", x=models, y=defaults,
+                             marker_color=COLORS["grid"], text=[f"{v:.4f}" for v in defaults],
+                             textposition='auto'))
+        fig.add_trace(go.Bar(name="Optuna Tuned", x=models, y=tuned,
+                             marker_color=COLORS["primary"], text=[f"{v:.4f}" for v in tuned],
+                             textposition='auto'))
+        fig.update_layout(title="Default vs Optuna-Tuned Performance",
+                          yaxis_title="Balanced Accuracy", barmode="group")
+        return CKDVisualizer._apply_dark_theme(fig)
+
+    # ── RISK TIMELINE VISUALIZATION ───────────────────────────
+
+    @staticmethod
+    def plot_risk_timeline(timeline_no_intervention, timeline_with_intervention=None):
+        """5-year risk progression line chart with risk zones."""
+        fig = go.Figure()
+
+        # Risk zone backgrounds
+        fig.add_hrect(y0=0, y1=0.3, fillcolor="rgba(77,150,255,0.08)",
+                      line_width=0, annotation_text="Low Risk Zone",
+                      annotation_position="top left")
+        fig.add_hrect(y0=0.3, y1=0.7, fillcolor="rgba(255,217,61,0.08)",
+                      line_width=0, annotation_text="Moderate Risk",
+                      annotation_position="top left")
+        fig.add_hrect(y0=0.7, y1=1.0, fillcolor="rgba(255,107,107,0.08)",
+                      line_width=0, annotation_text="High Risk",
+                      annotation_position="top left")
+
+        # No intervention line
+        fig.add_trace(go.Scatter(
+            x=timeline_no_intervention['Year'],
+            y=timeline_no_intervention['Risk_Score'],
+            name="No Intervention", mode='lines+markers',
+            line=dict(color=COLORS["ckd"], width=3, dash='solid'),
+            marker=dict(size=10, symbol='circle'),
+            text=[f"{r:.1%}" for r in timeline_no_intervention['Risk_Score']],
+            textposition="top center"
+        ))
+
+        # With intervention line
+        if timeline_with_intervention is not None:
+            fig.add_trace(go.Scatter(
+                x=timeline_with_intervention['Year'],
+                y=timeline_with_intervention['Risk_Score'],
+                name="With Intervention", mode='lines+markers',
+                line=dict(color=COLORS["non_ckd"], width=3, dash='solid'),
+                marker=dict(size=10, symbol='diamond'),
+                text=[f"{r:.1%}" for r in timeline_with_intervention['Risk_Score']],
+                textposition="bottom center"
+            ))
+
+        fig.update_layout(
+            title="5-Year CKD Risk Progression Forecast",
+            xaxis_title="Years from Now", yaxis_title="CKD Risk Score",
+            yaxis_range=[0, 1], xaxis=dict(dtick=1),
+            legend=dict(x=0.02, y=0.98)
+        )
+        return CKDVisualizer._apply_dark_theme(fig)
+
+    # ── MODEL RADAR CHART ─────────────────────────────────────
+
+    @staticmethod
+    def plot_model_radar(results_df, top_n=5):
+        """Radar chart comparing top models across multiple metrics."""
+        metrics = ['Balanced Accuracy', 'Macro Precision', 'Macro Recall', 'Macro F1', 'ROC-AUC']
+        available = [m for m in metrics if m in results_df.columns]
+        top = results_df.head(top_n)
+        colors = ["#4CC9F0", "#F72585", "#4361EE", "#FFD93D", "#7209B7"]
+
+        fig = go.Figure()
+        for i, (_, row) in enumerate(top.iterrows()):
+            values = [row[m] for m in available]
+            values.append(values[0])  # close the polygon
+            fig.add_trace(go.Scatterpolar(
+                r=values, theta=available + [available[0]],
+                name=row['Model'], fill='toself',
+                line=dict(color=colors[i % len(colors)], width=2),
+                opacity=0.7
+            ))
+
+        fig.update_layout(
+            polar=dict(
+                bgcolor=COLORS["bg"],
+                radialaxis=dict(visible=True, range=[0.4, 1.0], gridcolor=COLORS["grid"]),
+                angularaxis=dict(gridcolor=COLORS["grid"])
+            ),
+            title=f"Model Performance Radar (Top {top_n})",
+            showlegend=True
+        )
+        return CKDVisualizer._apply_dark_theme(fig)
+

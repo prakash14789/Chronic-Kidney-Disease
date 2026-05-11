@@ -6,6 +6,7 @@ from data_processor import CKDDataProcessor
 from model_trainer import CKDModelTrainer
 from visualizer import CKDVisualizer, COLORS
 from report_generator import CKDReportGenerator
+from stage_predictor import CKDStagePredictor
 
 # Page Config
 st.set_page_config(page_title="CKD Clinical Intelligence v3.2", page_icon="🧬", layout="wide")
@@ -197,6 +198,7 @@ processor = CKDDataProcessor()
 trainer = CKDModelTrainer()
 viz = CKDVisualizer()
 reporter = CKDReportGenerator()
+stage_predictor = CKDStagePredictor()
 
 # Sidebar
 with st.sidebar:
@@ -206,7 +208,21 @@ with st.sidebar:
     use_cv = st.checkbox("Enable Cross-Validation (Slower)", value=False)
     st.divider()
     st.markdown("[🔗 View Source on GitHub](https://github.com/prakash14789/Chronic-Kidney-Disease)")
-    st.success("v3 Research Pipeline Active")
+    st.success("v3.3 Research Pipeline Active")
+    st.divider()
+    # Model saving for API
+    if st.session_state.get('role') == 'admin':
+        if st.button("💾 Save Model for API", use_container_width=True):
+            try:
+                path = trainer.save_model_for_api(
+                    trained_nl[best_name] if 'trained_nl' in dir() else None,
+                    X_te_nl.columns if 'X_te_nl' in dir() else [],
+                    best_name if 'best_name' in dir() else 'unknown',
+                    best_th if 'best_th' in dir() else 0.5
+                )
+                st.success(f"Model saved to {path}")
+            except Exception as e:
+                st.error(f"Save failed: {e}")
     st.divider()
     if st.button("🚪 Logout", use_container_width=True):
         st.session_state['logged_in'] = False
@@ -282,13 +298,17 @@ st.markdown(f"""
 if st.session_state['role'] == "admin":
     tabs = st.tabs([
         "📊 Data Audit", "🚀 Exp 1 (Full)", "🛡️ Exp 2 (No-Leakage)", "📉 Comparison",
-        "🧬 SMOTE Insights", "🎯 Threshold Tuning", "🧠 SHAP Interpretation", "🔬 Deep Analysis", "🏥 Patient Diagnosis", "📂 Batch Diagnosis"
+        "🧬 SMOTE Insights", "🎯 Threshold Tuning", "🧠 SHAP Interpretation", "🔬 Deep Analysis",
+        "🏥 Patient Diagnosis", "📂 Batch Diagnosis",
+        "🏗️ CKD Staging", "⚡ Optuna Tuning", "📈 Risk Timeline"
     ])
-    t_audit, t_exp1, t_exp2, t_comp, t_smote, t_th, t_shap, t_deep, t_diag, t_batch = tabs
+    (t_audit, t_exp1, t_exp2, t_comp, t_smote, t_th, t_shap, t_deep,
+     t_diag, t_batch, t_stage, t_optuna, t_timeline) = tabs
 else:
     tabs = st.tabs(["🏥 Patient Diagnosis", "📂 Batch Diagnosis"])
     t_diag, t_batch = tabs
     t_audit = t_exp1 = t_exp2 = t_comp = t_smote = t_th = t_shap = t_deep = None
+    t_stage = t_optuna = t_timeline = None
 
 # --- TAB 1: DATA AUDIT ---
 if t_audit:
@@ -689,5 +709,278 @@ if t_batch:
             except Exception as e:
                 st.error(f"Error processing file: {e}")
 
+# --- TAB 11: CKD STAGING ---
+if t_stage:
+    with t_stage:
+        st.header("🏗️ CKD Stage Prediction (Multi-Class)")
+        st.info("Predicts CKD stages 1–5 based on KDIGO guidelines using non-leakage features. Stages are derived from GFR ranges, but the model predicts stages *without* GFR.")
+
+        @st.cache_data
+        def run_stage_pipeline(_df_full, sample_n):
+            sp = CKDStagePredictor()
+            results = sp.train(_df_full, sample_n=sample_n)
+            return sp, results
+
+        with st.spinner("Training multi-class stage predictor..."):
+            stage_model, stage_results = run_stage_pipeline(df_full, sample_size)
+
+        # Stage overview
+        st.subheader("📊 Stage Distribution in Dataset")
+        sc1, sc2 = st.columns([1, 2])
+        with sc1:
+            st.plotly_chart(viz.plot_stage_distribution(stage_results['stage_distribution']),
+                            use_container_width=True, key="stage_dist")
+        with sc2:
+            # Stage definitions table
+            st.markdown("""
+            <div class='glass-card'>
+            <h4>KDIGO Stage Definitions</h4>
+            <table style='width:100%; color: inherit;'>
+            <tr><th>Stage</th><th>GFR Range</th><th>Severity</th></tr>
+            <tr><td>🟢 Stage 1</td><td>≥90 mL/min</td><td>Normal/High</td></tr>
+            <tr><td>🔵 Stage 2</td><td>60–89 mL/min</td><td>Mild</td></tr>
+            <tr><td>🟡 Stage 3</td><td>30–59 mL/min</td><td>Moderate</td></tr>
+            <tr><td>🟠 Stage 4</td><td>15–29 mL/min</td><td>Severe</td></tr>
+            <tr><td>🔴 Stage 5</td><td><15 mL/min</td><td>Kidney Failure</td></tr>
+            </table>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("---")
+        st.subheader("🎯 Model Performance")
+        st.metric("Balanced Accuracy", f"{stage_results['balanced_accuracy']:.2%}")
+
+        sr1, sr2 = st.columns(2)
+        with sr1:
+            # Per-class metrics
+            report_df = pd.DataFrame(stage_results['report']).T
+            report_df = report_df.drop(['accuracy', 'macro avg', 'weighted avg'], errors='ignore')
+            st.dataframe(report_df.round(3), use_container_width=True)
+        with sr2:
+            st.plotly_chart(viz.plot_stage_confusion(
+                stage_results['y_test'], stage_results['y_pred']
+            ), use_container_width=True, key="stage_cm")
+
+        st.markdown("---")
+        st.subheader("🔑 Top Features for Stage Prediction")
+        top_feats = stage_results['feature_importances'].head(10)
+        import plotly.express as px
+        fig_fi = px.bar(x=top_feats.values, y=top_feats.index, orientation='h',
+                        color=top_feats.values, color_continuous_scale='blues',
+                        labels={'x': 'Importance', 'y': 'Feature'})
+        fig_fi.update_layout(title="Top 10 Features for CKD Stage Classification",
+                             yaxis=dict(autorange="reversed"))
+        st.plotly_chart(viz._apply_dark_theme(fig_fi), use_container_width=True, key="stage_fi")
+
+        # Individual stage prediction (reuses diagnosis form values if available)
+        st.markdown("---")
+        st.subheader("🏥 Predict Stage for a Patient")
+        if st.button("🔬 Predict CKD Stage (Using Last Diagnosis Input)", key="stage_predict_btn"):
+            try:
+                input_row_stage = X_te_nl.mean().to_frame().T.copy()
+                # Ensure all stage features are present
+                for feat in stage_model.feature_names:
+                    if feat not in input_row_stage.columns:
+                        input_row_stage[feat] = 0
+                input_row_stage = input_row_stage[stage_model.feature_names]
+
+                result = stage_model.predict_stage(input_row_stage)
+                info = result['stage_info']
+
+                st.plotly_chart(viz.plot_stage_prediction_bar(
+                    result['stage_probabilities'], result['predicted_stage']
+                ), use_container_width=True, key="stage_pred_bar")
+
+                st.markdown(f"""
+                <div class='metric-card' style='border-left: 6px solid {info["color"]}; text-align: center;'>
+                    <h3>{info["icon"]} Predicted: {info["name"]}</h3>
+                    <p style='font-size: 1.1rem;'>{info["description"]}</p>
+                    <p style='font-size: 0.95rem; color: #94a3b8;'>GFR Range: {info["gfr_range"]}</p>
+                    <p style='margin-top: 12px;'><strong>Action:</strong> {info["action"]}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Stage prediction error: {e}")
+
+# --- TAB 12: OPTUNA TUNING ---
+if t_optuna:
+    with t_optuna:
+        st.header("⚡ Hyperparameter Tuning with Optuna")
+        st.info("Automatically searches for optimal hyperparameters using Bayesian optimization. Tunes Random Forest, Gradient Boosting, XGBoost, and LightGBM.")
+
+        n_trials = st.slider("Number of Trials per Model", 10, 100, 30, key="optuna_trials")
+
+        if st.button("🚀 Start Optuna Tuning", key="optuna_start", type="primary"):
+            with st.spinner(f"Running {n_trials} trials per model... This may take a few minutes."):
+                optuna_results = trainer.tune_with_optuna(
+                    X_tr_nl, y_tr_f, X_te_nl, y_te_f, n_trials=n_trials
+                )
+
+            st.success("✅ Tuning complete!")
+
+            # Optimization history
+            st.subheader("📈 Optimization History")
+            st.plotly_chart(viz.plot_optuna_history(optuna_results),
+                            use_container_width=True, key="optuna_hist")
+
+            # Before vs After comparison
+            st.subheader("📊 Default vs Tuned Performance")
+            default_scores = {}
+            for _, row in res_nl.iterrows():
+                if row['Model'] in optuna_results:
+                    default_scores[row['Model']] = row['Balanced Accuracy']
+            st.plotly_chart(viz.plot_optuna_comparison(optuna_results, default_scores),
+                            use_container_width=True, key="optuna_comp")
+
+            # Best params for each model
+            st.subheader("🏆 Best Hyperparameters Found")
+            for model_name, data in optuna_results.items():
+                with st.expander(f"**{model_name}** — Best Score: {data['best_score']:.4f}"):
+                    improvement = data['best_score'] - default_scores.get(model_name, 0)
+                    if improvement > 0:
+                        st.success(f"Improvement: +{improvement:.4f} Balanced Accuracy")
+                    else:
+                        st.info(f"Change: {improvement:+.4f} (default params were already strong)")
+
+                    params_df = pd.DataFrame([data['best_params']]).T
+                    params_df.columns = ["Value"]
+                    params_df.index.name = "Parameter"
+                    st.dataframe(params_df, use_container_width=True)
+
+            # Summary
+            st.markdown("---")
+            best_tuned = max(optuna_results.items(), key=lambda x: x[1]['best_score'])
+            st.markdown(f"""
+            <div class='metric-card' style='text-align: center;'>
+                <h4>🏆 Overall Best After Tuning</h4>
+                <h2 style='color: #4361EE;'>{best_tuned[0]}</h2>
+                <p>Balanced Accuracy: <strong>{best_tuned[1]['best_score']:.4f}</strong></p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class='glass-card'>
+                <h4>ℹ️ How Optuna Works</h4>
+                <p><strong>Bayesian Optimization:</strong> Unlike grid search, Optuna uses TPE (Tree-structured Parzen Estimators) to intelligently explore the hyperparameter space, focusing on promising regions.</p>
+                <p><strong>What gets tuned:</strong></p>
+                <ul>
+                    <li>🌲 <strong>Random Forest:</strong> n_estimators, max_depth, min_samples_split/leaf, max_features</li>
+                    <li>📈 <strong>Gradient Boosting:</strong> n_estimators, max_depth, learning_rate, subsample</li>
+                    <li>🚀 <strong>XGBoost:</strong> + colsample_bytree, reg_alpha, reg_lambda</li>
+                    <li>⚡ <strong>LightGBM:</strong> + num_leaves, regularization params</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+# --- TAB 13: RISK TIMELINE ---
+if t_timeline:
+    with t_timeline:
+        st.header("📈 5-Year Risk Progression Simulator")
+        st.info("Simulates how a patient's CKD risk evolves over 5 years under two scenarios: natural progression vs. lifestyle intervention.")
+
+        st.subheader("Configure Patient Profile")
+        with st.form("timeline_form"):
+            tl1, tl2, tl3, tl4 = st.columns(4)
+            with tl1:
+                tl_age = st.number_input("Age", 20, 90, 50, key="tl_age")
+                tl_bmi = st.number_input("BMI", 15.0, 45.0, 28.0, key="tl_bmi")
+            with tl2:
+                tl_systolic = st.number_input("Systolic BP", 90, 200, 135, key="tl_sys")
+                tl_diastolic = st.number_input("Diastolic BP", 60, 130, 88, key="tl_dia")
+            with tl3:
+                tl_hba1c = st.number_input("HbA1c (%)", 4.0, 15.0, 6.5, key="tl_hba1c")
+                tl_fbs = st.number_input("Fasting Blood Sugar", 70, 250, 115, key="tl_fbs")
+            with tl4:
+                tl_activity = st.number_input("Physical Activity (min/wk)", 0, 300, 90, key="tl_act")
+                tl_years = st.slider("Projection Years", 1, 10, 5, key="tl_years")
+
+            tl_submit = st.form_submit_button("🔮 Simulate Progression", type="primary")
+
+        if tl_submit:
+            # Build patient input
+            tl_input = X_te_nl.mean().to_frame().T.copy()
+            tl_input["Age"] = tl_age
+            tl_input["BMI"] = tl_bmi
+            tl_input["SystolicBP"] = tl_systolic
+            tl_input["DiastolicBP"] = tl_diastolic
+            tl_input["HbA1c"] = tl_hba1c
+            tl_input["FastingBloodSugar"] = tl_fbs
+            tl_input["PhysicalActivity"] = tl_activity
+            tl_input = tl_input[X_te_nl.columns]
+
+            # Run both scenarios
+            timeline_no = trainer.simulate_risk_progression(
+                trained_nl[best_name], tl_input, X_te_nl.columns,
+                years=tl_years, scenario="no_intervention"
+            )
+            timeline_yes = trainer.simulate_risk_progression(
+                trained_nl[best_name], tl_input, X_te_nl.columns,
+                years=tl_years, scenario="with_intervention"
+            )
+
+            # Main chart
+            st.plotly_chart(viz.plot_risk_timeline(timeline_no, timeline_yes),
+                            use_container_width=True, key="risk_timeline")
+
+            # Summary cards
+            tmc1, tmc2, tmc3 = st.columns(3)
+            with tmc1:
+                st.markdown(f"""
+                <div class='metric-card'>
+                    <h4>📍 Current Risk</h4>
+                    <h2 style='color: #4361EE;'>{timeline_no.iloc[0]['Risk_Score']:.1%}</h2>
+                    <p>{timeline_no.iloc[0]['Risk_Level']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            with tmc2:
+                st.markdown(f"""
+                <div class='metric-card' style='border-left-color: #FF6B6B;'>
+                    <h4>🚨 Year {tl_years} (No Action)</h4>
+                    <h2 style='color: #FF6B6B;'>{timeline_no.iloc[-1]['Risk_Score']:.1%}</h2>
+                    <p>{timeline_no.iloc[-1]['Risk_Level']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            with tmc3:
+                st.markdown(f"""
+                <div class='metric-card' style='border-left-color: #4D96FF;'>
+                    <h4>✅ Year {tl_years} (With Intervention)</h4>
+                    <h2 style='color: #4D96FF;'>{timeline_yes.iloc[-1]['Risk_Score']:.1%}</h2>
+                    <p>{timeline_yes.iloc[-1]['Risk_Level']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # Risk reduction
+            risk_reduction = timeline_no.iloc[-1]['Risk_Score'] - timeline_yes.iloc[-1]['Risk_Score']
+            st.markdown(f"""
+            <div class='glass-card' style='text-align: center;'>
+                <h4>💡 Potential Risk Reduction at Year {tl_years}</h4>
+                <h2 style='color: #4CC9F0;'>{risk_reduction:.1%} lower risk with intervention</h2>
+                <p style='color: #94a3b8; margin-top: 10px;'>
+                    Intervention assumptions: increased physical activity (+10 min/wk/yr),
+                    improved diet (+0.5/yr), BP management (-3 mmHg/yr), weight loss (-0.5 BMI/yr)
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Year-by-year table
+            st.subheader("📋 Year-by-Year Comparison")
+            comparison = pd.DataFrame({
+                'Year': timeline_no['Year'],
+                'Risk (No Intervention)': [f"{r:.1%}" for r in timeline_no['Risk_Score']],
+                'Level (No Intervention)': timeline_no['Risk_Level'],
+                'Risk (With Intervention)': [f"{r:.1%}" for r in timeline_yes['Risk_Score']],
+                'Level (With Intervention)': timeline_yes['Risk_Level'],
+            })
+            st.dataframe(comparison, use_container_width=True)
+
+# --- SAVE MODEL AFTER PIPELINE (for sidebar button) ---
+try:
+    trainer.save_model_for_api(
+        trained_nl[best_name], X_te_nl.columns, best_name, best_th
+    )
+except Exception:
+    pass
+
 st.markdown("---")
-st.caption("CKD Intelligence v3.2 — Precision Research Dashboard.")
+st.caption("CKD Intelligence v3.3 — Precision Research Dashboard with Stage Prediction, Optuna Tuning & Risk Timeline.")
+

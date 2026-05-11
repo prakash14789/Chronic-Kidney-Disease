@@ -272,3 +272,163 @@ class CKDModelTrainer:
         })
         df['AbsImpact'] = df['Impact'].abs()
         return df.sort_values('AbsImpact', ascending=False).head(top_n).drop(columns=['AbsImpact'])
+
+    # ── OPTUNA HYPERPARAMETER TUNING ──────────────────────────
+    def tune_with_optuna(self, X_train, y_train, X_test, y_test, n_trials=50):
+        """Hyperparameter tuning with Optuna for top models."""
+        import optuna
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+        results = {}
+
+        # 1. Random Forest
+        def rf_objective(trial):
+            params = {
+                'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+                'max_depth': trial.suggest_int('max_depth', 3, 15),
+                'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),
+                'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 10),
+                'max_features': trial.suggest_categorical('max_features', ['sqrt', 'log2', None]),
+                'class_weight': 'balanced',
+                'random_state': self.random_state, 'n_jobs': -1
+            }
+            model = RandomForestClassifier(**params)
+            model.fit(X_train, y_train)
+            return balanced_accuracy_score(y_test, model.predict(X_test))
+
+        study_rf = optuna.create_study(direction='maximize', study_name='RandomForest')
+        study_rf.optimize(rf_objective, n_trials=n_trials, show_progress_bar=False)
+        results['Random Forest'] = {
+            'best_params': study_rf.best_params,
+            'best_score': study_rf.best_value,
+            'optimization_history': [(t.number, t.value) for t in study_rf.trials if t.value is not None]
+        }
+
+        # 2. Gradient Boosting
+        def gb_objective(trial):
+            params = {
+                'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+                'max_depth': trial.suggest_int('max_depth', 3, 10),
+                'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
+                'subsample': trial.suggest_float('subsample', 0.6, 1.0),
+                'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),
+                'random_state': self.random_state
+            }
+            model = GradientBoostingClassifier(**params)
+            model.fit(X_train, y_train)
+            return balanced_accuracy_score(y_test, model.predict(X_test))
+
+        study_gb = optuna.create_study(direction='maximize', study_name='GradientBoosting')
+        study_gb.optimize(gb_objective, n_trials=n_trials, show_progress_bar=False)
+        results['Gradient Boosting'] = {
+            'best_params': study_gb.best_params,
+            'best_score': study_gb.best_value,
+            'optimization_history': [(t.number, t.value) for t in study_gb.trials if t.value is not None]
+        }
+
+        # 3. XGBoost
+        if XGBClassifier:
+            def xgb_objective(trial):
+                params = {
+                    'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+                    'max_depth': trial.suggest_int('max_depth', 3, 12),
+                    'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
+                    'subsample': trial.suggest_float('subsample', 0.6, 1.0),
+                    'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),
+                    'reg_alpha': trial.suggest_float('reg_alpha', 1e-8, 10.0, log=True),
+                    'reg_lambda': trial.suggest_float('reg_lambda', 1e-8, 10.0, log=True),
+                    'eval_metric': 'logloss', 'random_state': self.random_state
+                }
+                model = XGBClassifier(**params)
+                model.fit(X_train, y_train)
+                return balanced_accuracy_score(y_test, model.predict(X_test))
+
+            study_xgb = optuna.create_study(direction='maximize', study_name='XGBoost')
+            study_xgb.optimize(xgb_objective, n_trials=n_trials, show_progress_bar=False)
+            results['XGBoost'] = {
+                'best_params': study_xgb.best_params,
+                'best_score': study_xgb.best_value,
+                'optimization_history': [(t.number, t.value) for t in study_xgb.trials if t.value is not None]
+            }
+
+        # 4. LightGBM
+        if LGBMClassifier:
+            def lgbm_objective(trial):
+                params = {
+                    'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+                    'max_depth': trial.suggest_int('max_depth', 3, 12),
+                    'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
+                    'subsample': trial.suggest_float('subsample', 0.6, 1.0),
+                    'num_leaves': trial.suggest_int('num_leaves', 20, 150),
+                    'reg_alpha': trial.suggest_float('reg_alpha', 1e-8, 10.0, log=True),
+                    'reg_lambda': trial.suggest_float('reg_lambda', 1e-8, 10.0, log=True),
+                    'is_unbalance': True, 'random_state': self.random_state, 'verbose': -1
+                }
+                model = LGBMClassifier(**params)
+                model.fit(X_train, y_train)
+                return balanced_accuracy_score(y_test, model.predict(X_test))
+
+            study_lgbm = optuna.create_study(direction='maximize', study_name='LightGBM')
+            study_lgbm.optimize(lgbm_objective, n_trials=n_trials, show_progress_bar=False)
+            results['LightGBM'] = {
+                'best_params': study_lgbm.best_params,
+                'best_score': study_lgbm.best_value,
+                'optimization_history': [(t.number, t.value) for t in study_lgbm.trials if t.value is not None]
+            }
+
+        return results
+
+    # ── RISK TIMELINE SIMULATION ──────────────────────────────
+    def simulate_risk_progression(self, model, patient_data, feature_cols, years=5,
+                                  scenario="no_intervention"):
+        """Simulate patient risk over time with annual feature changes.
+        
+        Scenarios:
+            no_intervention: natural disease progression
+            with_intervention: lifestyle improvements applied
+        """
+        if scenario == "with_intervention":
+            annual_changes = {
+                'Age': 1.0, 'BMI': -0.5, 'SystolicBP': -3.0, 'DiastolicBP': -2.0,
+                'FastingBloodSugar': -3.0, 'HbA1c': -0.1, 'CholesterolTotal': -5.0,
+                'HemoglobinLevels': 0.05, 'FatigueLevels': -0.4,
+                'PhysicalActivity': 10, 'DietQuality': 0.5, 'SleepQuality': 0.3,
+                'QualityOfLifeScore': 3,
+            }
+        else:
+            annual_changes = {
+                'Age': 1.0, 'BMI': 0.3, 'SystolicBP': 1.5, 'DiastolicBP': 0.8,
+                'FastingBloodSugar': 2.0, 'HbA1c': 0.1, 'CholesterolTotal': 3.0,
+                'HemoglobinLevels': -0.1, 'FatigueLevels': 0.3,
+                'PhysicalActivity': -5, 'DietQuality': -0.2, 'SleepQuality': -0.1,
+                'QualityOfLifeScore': -2,
+            }
+
+        timeline = []
+        current = patient_data.copy()
+
+        for year in range(years + 1):
+            prob = float(model.predict_proba(current[feature_cols])[0, 1])
+            level = 'Low' if prob < 0.3 else 'Moderate' if prob < 0.7 else 'High'
+            timeline.append({'Year': year, 'Risk_Score': prob, 'Risk_Level': level})
+            # Apply changes for next year
+            for feat, delta in annual_changes.items():
+                if feat in current.columns:
+                    current[feat] = current[feat] + delta
+
+        return pd.DataFrame(timeline)
+
+    # ── MODEL SAVING FOR API ──────────────────────────────────
+    @staticmethod
+    def save_model_for_api(model, feature_names, model_name, threshold,
+                           output_dir="saved_models"):
+        """Save trained model and metadata for the FastAPI endpoint."""
+        import joblib, os
+        os.makedirs(output_dir, exist_ok=True)
+        joblib.dump(model, os.path.join(output_dir, "best_model.pkl"))
+        joblib.dump(list(feature_names), os.path.join(output_dir, "feature_names.pkl"))
+        joblib.dump({
+            "model_name": model_name,
+            "threshold": float(threshold),
+            "features_count": len(feature_names),
+        }, os.path.join(output_dir, "model_meta.pkl"))
+        return os.path.join(output_dir, "best_model.pkl")
