@@ -23,6 +23,8 @@ warnings.filterwarnings("ignore")
 
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import time
@@ -124,8 +126,8 @@ def run_experiment(X_tr, X_te, y_tr, y_te, models_dict,
     return results_df, roc_data
 
 
-from google.colab import files
-uploaded = files.upload()
+# from google.colab import files
+# uploaded = files.upload()
 
 # ── 1. LOAD DATA ──────────────────────────────────────────
 DATA_PATH    = "Chronickidneydiseases.csv"

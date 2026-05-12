@@ -63,9 +63,11 @@ class CKDStagePredictor:
         drop_cols = ["PatientID", "RecommendedVisitsPerMonth"] + leakage_cols
         features = df_stage.drop(columns=[c for c in drop_cols if c in df_stage.columns])
 
-        if 'Adherence' in features.columns and features['Adherence'].dtype == 'object':
-            le = LabelEncoder()
-            features['Adherence'] = le.fit_transform(features['Adherence'])
+        if 'Adherence' in features.columns:
+            # Check if it contains strings (sometimes it's object or string dtype)
+            if features['Adherence'].dtype == 'object' or features['Adherence'].dtype == 'string' or isinstance(features['Adherence'].iloc[0], str):
+                le = LabelEncoder()
+                features['Adherence'] = le.fit_transform(features['Adherence'].astype(str))
 
         return features, df_stage['CKD_Stage']
 
