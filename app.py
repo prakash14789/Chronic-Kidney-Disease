@@ -200,6 +200,10 @@ viz = CKDVisualizer()
 reporter = CKDReportGenerator()
 stage_predictor = CKDStagePredictor()
 
+@st.cache_resource
+def get_cached_shap(_model, X_test):
+    return trainer.get_shap_explainer(_model, X_test)
+
 # Sidebar
 with st.sidebar:
     st.title("🧬 CKD Intelligence")
@@ -430,7 +434,7 @@ if t_shap:
         st.header("🧠 Model Interpretation (SHAP)")
         with st.spinner("Calculating Global SHAP..."):
             X_test_df = pd.DataFrame(X_te_nl.values, columns=X_te_nl.columns).reset_index(drop=True)
-            explainer, shap_values, X_df = trainer.get_shap_explainer(trained_nl[best_name], X_test_df)
+            explainer, shap_values, X_df = get_cached_shap(trained_nl[best_name], X_test_df)
         cs1, cs2 = st.columns(2)
         with cs1: st.pyplot(viz.plot_shap_bar(explainer, shap_values, X_df, best_name))
         with cs2: st.pyplot(viz.plot_shap_summary(explainer, shap_values, X_df, best_name))
@@ -974,12 +978,7 @@ if t_timeline:
             st.dataframe(comparison, use_container_width=True)
 
 # --- SAVE MODEL AFTER PIPELINE (for sidebar button) ---
-try:
-    trainer.save_model_for_api(
-        trained_nl[best_name], X_te_nl.columns, best_name, best_th
-    )
-except Exception:
-    pass
+# Removed redundant auto-save to improve performance. Use the sidebar button instead.
 
 st.markdown("---")
 st.caption("CKD Intelligence v3.3 — Precision Research Dashboard with Stage Prediction, Optuna Tuning & Risk Timeline.")
