@@ -7,11 +7,16 @@ Run: uvicorn api:app --reload --port 8000
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List, Dict, Any
 import joblib
 import pandas as pd
 import numpy as np
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="CKD Clinical Intelligence API",
@@ -37,29 +42,29 @@ MODEL_DIR = "saved_models"
 # ── Pydantic Models ────────────────────────────────────────
 class PatientInput(BaseModel):
     """Patient clinical input for CKD risk prediction."""
-    Age: Optional[float] = Field(50, description="Patient age in years")
-    Gender: Optional[int] = Field(1, description="1=Male, 0=Female")
-    BMI: Optional[float] = Field(25.0, description="Body Mass Index")
-    Smoking: Optional[int] = Field(0, description="1=Yes, 0=No")
-    PhysicalActivity: Optional[float] = Field(150, description="Minutes per week")
-    DietQuality: Optional[float] = Field(5, description="0-10 scale")
-    SleepQuality: Optional[float] = Field(7, description="0-10 scale")
-    SystolicBP: Optional[float] = Field(120, description="Systolic blood pressure mmHg")
-    DiastolicBP: Optional[float] = Field(80, description="Diastolic blood pressure mmHg")
-    FastingBloodSugar: Optional[float] = Field(100, description="mg/dL")
-    HbA1c: Optional[float] = Field(5.5, description="Glycated hemoglobin %")
-    HemoglobinLevels: Optional[float] = Field(14.0, description="g/dL")
-    CholesterolTotal: Optional[float] = Field(180, description="mg/dL")
-    SerumElectrolytesSodium: Optional[float] = Field(140, description="mEq/L")
-    SerumElectrolytesPotassium: Optional[float] = Field(4.5, description="mEq/L")
-    FamilyHistoryKidneyDisease: Optional[int] = Field(0, description="1=Yes, 0=No")
-    FamilyHistoryHypertension: Optional[int] = Field(0, description="1=Yes, 0=No")
-    FamilyHistoryDiabetes: Optional[int] = Field(0, description="1=Yes, 0=No")
-    Edema: Optional[int] = Field(0, description="1=Yes, 0=No")
-    FatigueLevels: Optional[float] = Field(3, description="0-10 scale")
-    QualityOfLifeScore: Optional[float] = Field(70, description="0-100")
-    HeavyMetalsExposure: Optional[int] = Field(0, description="1=Yes, 0=No")
-    Adherence: Optional[int] = Field(0, description="0=Adherent, 1=Non-Adherent")
+    Age: Optional[float] = Field(50, description="Patient age in years", ge=0, le=120)
+    Gender: Optional[int] = Field(1, description="1=Male, 0=Female", ge=0, le=1)
+    BMI: Optional[float] = Field(25.0, description="Body Mass Index", ge=10, le=100)
+    Smoking: Optional[int] = Field(0, description="1=Yes, 0=No", ge=0, le=1)
+    PhysicalActivity: Optional[float] = Field(150, description="Minutes per week", ge=0, le=10080)
+    DietQuality: Optional[float] = Field(5, description="0-10 scale", ge=0, le=10)
+    SleepQuality: Optional[float] = Field(7, description="0-10 scale", ge=0, le=10)
+    SystolicBP: Optional[float] = Field(120, description="Systolic blood pressure mmHg", ge=50, le=300)
+    DiastolicBP: Optional[float] = Field(80, description="Diastolic blood pressure mmHg", ge=30, le=200)
+    FastingBloodSugar: Optional[float] = Field(100, description="mg/dL", ge=50, le=500)
+    HbA1c: Optional[float] = Field(5.5, description="Glycated hemoglobin %", ge=3, le=20)
+    HemoglobinLevels: Optional[float] = Field(14.0, description="g/dL", ge=5, le=25)
+    CholesterolTotal: Optional[float] = Field(180, description="mg/dL", ge=50, le=1000)
+    SerumElectrolytesSodium: Optional[float] = Field(140, description="mEq/L", ge=100, le=200)
+    SerumElectrolytesPotassium: Optional[float] = Field(4.5, description="mEq/L", ge=1, le=10)
+    FamilyHistoryKidneyDisease: Optional[int] = Field(0, description="1=Yes, 0=No", ge=0, le=1)
+    FamilyHistoryHypertension: Optional[int] = Field(0, description="1=Yes, 0=No", ge=0, le=1)
+    FamilyHistoryDiabetes: Optional[int] = Field(0, description="1=Yes, 0=No", ge=0, le=1)
+    Edema: Optional[int] = Field(0, description="1=Yes, 0=No", ge=0, le=1)
+    FatigueLevels: Optional[float] = Field(3, description="0-10 scale", ge=0, le=10)
+    QualityOfLifeScore: Optional[float] = Field(70, description="0-100", ge=0, le=100)
+    HeavyMetalsExposure: Optional[int] = Field(0, description="1=Yes, 0=No", ge=0, le=1)
+    Adherence: Optional[int] = Field(0, description="0=Adherent, 1=Non-Adherent", ge=0, le=1)
 
 
 class PredictionResponse(BaseModel):
@@ -80,7 +85,7 @@ class HealthResponse(BaseModel):
 
 
 # ── Helper ─────────────────────────────────────────────────
-def get_assessment(probability):
+def get_assessment(probability: float) -> Dict[str, str]:
     """Risk stratification matching the Streamlit app logic."""
     if probability < 0.3:
         return {"level": "Low Risk", "color": "#4D96FF",
@@ -93,7 +98,7 @@ def get_assessment(probability):
                 "action": "Immediate medical attention required. Urgent nephrologist referral."}
 
 
-def load_models():
+def load_models() -> bool:
     """Load saved model and feature names."""
     global MODEL, FEATURE_NAMES
     model_path = os.path.join(MODEL_DIR, "best_model.pkl")
@@ -109,17 +114,17 @@ def load_models():
 
 # ── Events ─────────────────────────────────────────────────
 @app.on_event("startup")
-def startup():
+def startup() -> None:
     loaded = load_models()
     if loaded:
-        print(f"✅ Model loaded with {len(FEATURE_NAMES)} features")
+        logger.info(f"✅ Model loaded with {len(FEATURE_NAMES)} features")
     else:
-        print("⚠️  No saved model found. Run the Streamlit app first and click 'Save Model for API'.")
+        logger.warning("⚠️  No saved model found. Run the Streamlit app first and click 'Save Model for API'.")
 
 
 # ── Endpoints ──────────────────────────────────────────────
 @app.get("/health", response_model=HealthResponse, tags=["System"])
-def health_check():
+def health_check() -> HealthResponse:
     """Check API health and model status."""
     meta = {}
     meta_path = os.path.join(MODEL_DIR, "model_meta.pkl")
@@ -135,7 +140,7 @@ def health_check():
 
 
 @app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
-def predict(patient: PatientInput):
+def predict(patient: PatientInput) -> PredictionResponse:
     """Predict CKD risk for a single patient."""
     if MODEL is None:
         raise HTTPException(
@@ -174,24 +179,33 @@ def predict(patient: PatientInput):
 
 
 @app.post("/predict/batch", tags=["Prediction"])
-def predict_batch(patients: list[PatientInput]):
+def predict_batch(patients: List[PatientInput]) -> Dict[str, Any]:
     """Predict CKD risk for multiple patients at once."""
     if MODEL is None:
         raise HTTPException(status_code=503, detail="Model not loaded.")
 
-    results = []
-    for patient in patients:
-        patient_dict = patient.model_dump()
-        input_df = pd.DataFrame([patient_dict])
-        for feat in FEATURE_NAMES:
-            if feat not in input_df.columns:
-                input_df[feat] = 0
-        input_df = input_df[FEATURE_NAMES]
+    if not patients:
+        return {"predictions": [], "count": 0}
 
-        prob = float(MODEL.predict_proba(input_df)[0, 1])
-        assessment = get_assessment(prob)
+    # Convert all patients to dicts
+    patient_dicts = [p.model_dump() for p in patients]
+    input_df = pd.DataFrame(patient_dicts)
+
+    # Ensure all features are present and in correct order
+    for feat in FEATURE_NAMES:
+        if feat not in input_df.columns:
+            input_df[feat] = 0
+    input_df = input_df[FEATURE_NAMES]
+
+    # Predict all at once
+    probs = MODEL.predict_proba(input_df)[:, 1]
+
+    results = []
+    for prob in probs:
+        prob_float = float(prob)
+        assessment = get_assessment(prob_float)
         results.append({
-            "risk_score": round(prob, 4),
+            "risk_score": round(prob_float, 4),
             "risk_level": assessment["level"],
             "clinical_action": assessment["action"]
         })

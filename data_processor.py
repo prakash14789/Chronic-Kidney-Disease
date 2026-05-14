@@ -2,17 +2,18 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+from typing import Tuple
 
 class CKDDataProcessor:
-    def __init__(self, data_path="Chronickidneydiseases.csv", random_state=42):
+    def __init__(self, data_path: str = "Chronickidneydiseases.csv", random_state: int = 42):
         self.data_path = data_path
         self.random_state = random_state
         self.le_adherence = LabelEncoder()
         
-    def load_raw_data(self):
+    def load_raw_data(self) -> pd.DataFrame:
         return pd.read_csv(self.data_path)
     
-    def get_v3_refined_data(self, df_full, sample_n=5000):
+    def get_v3_refined_data(self, df_full: pd.DataFrame, sample_n: int = 5000) -> pd.DataFrame:
         """EXACT V3 Data Refining Logic."""
         # 1. Stratified Sample
         idx, _ = train_test_split(
@@ -27,7 +28,7 @@ class CKDDataProcessor:
         
         return df
 
-    def split_and_encode_v3(self, df, target="Diagnosis"):
+    def split_and_encode_v3(self, df: pd.DataFrame, target: str = "Diagnosis") -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
         """V3 Encoding and Splitting — encode before split for consistency."""
         X = df.drop(columns=[target])
         y = df[target]

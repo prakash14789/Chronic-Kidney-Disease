@@ -2,6 +2,7 @@ import time
 import pandas as pd
 import numpy as np
 import copy
+from typing import Any, List, Tuple, Dict
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
@@ -35,10 +36,10 @@ try: from lightgbm import LGBMClassifier
 except: LGBMClassifier = None
 
 class CKDModelTrainer:
-    def __init__(self, random_state=42):
+    def __init__(self, random_state: int = 42):
         self.random_state = random_state
 
-    def build_pipeline(self, clf, needs_scaling=False, use_smote=True):
+    def build_pipeline(self, clf: Any, needs_scaling: bool = False, use_smote: bool = True) -> Any:
         """EXACT V3 Pipeline Builder."""
         steps = []
         if use_smote and SMOTE_AVAILABLE:
@@ -53,7 +54,7 @@ class CKDModelTrainer:
         steps.append(("clf", clf))
         return PipelineCls(steps)
 
-    def get_v3_pipelines(self, n_neg, n_pos, use_smote=True):
+    def get_v3_pipelines(self, n_neg: int, n_pos: int, use_smote: bool = True) -> List[Tuple[str, Any]]:
         """Returns the EXACT list of v3 pipelines."""
         base = [
             ("Logistic Regression", LogisticRegression(max_iter=1000, class_weight="balanced", random_state=self.random_state), True),
@@ -75,7 +76,7 @@ class CKDModelTrainer:
         
         return [(name, self.build_pipeline(clf, needs_scaling=sc, use_smote=use_smote)) for name, clf, sc in base]
 
-    def run_v3_experiment(self, X_tr, X_te, y_tr, y_te, pipelines, use_cv=False):
+    def run_v3_experiment(self, X_tr: pd.DataFrame, X_te: pd.DataFrame, y_tr: pd.Series, y_te: pd.Series, pipelines: List[Tuple[str, Any]], use_cv: bool = False) -> Tuple[pd.DataFrame, Dict, Dict, Dict]:
         """EXACT V3 Experiment Runner optimized for speed."""
         cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=self.random_state)
         results, roc_data, pr_data, trained = [], {}, {}, {}
@@ -124,14 +125,14 @@ class CKDModelTrainer:
         return df_res, roc_data, pr_data, trained
 
     @staticmethod
-    def run_sanity_check(pipeline, X_test, y_test):
+    def run_sanity_check(pipeline: Any, X_test: pd.DataFrame, y_test: pd.Series) -> float:
         """Shuffles target labels to verify the performance drops (Requirement #8)."""
         y_test_shuffled = np.random.permutation(y_test)
         y_pred = pipeline.predict(X_test)
         acc_shuffled = balanced_accuracy_score(y_test_shuffled, y_pred)
         return acc_shuffled
 
-    def tune_threshold(self, y_true, y_proba):
+    def tune_threshold(self, y_true: np.ndarray, y_proba: np.ndarray) -> Tuple[pd.DataFrame, float]:
         """EXACT V3 Threshold Tuning Logic."""
         thresholds = np.arange(0.05, 0.95, 0.05)
         rows = []
@@ -146,7 +147,7 @@ class CKDModelTrainer:
         best_th = df.loc[df["Macro F1"].idxmax(), "Threshold"]
         return df, best_th
 
-    def get_clinical_assessment(self, probability):
+    def get_clinical_assessment(self, probability: float) -> Dict[str, str]:
         """Risk Stratification and Clinical Recommendations."""
         if probability < 0.3:
             return {
@@ -170,7 +171,7 @@ class CKDModelTrainer:
                 "Icon": "🚨"
             }
 
-    def get_shap_explainer(self, model, X_test):
+    def get_shap_explainer(self, model: Any, X_test: pd.DataFrame) -> Tuple[Any, Any, pd.DataFrame]:
         """Generates SHAP values for the best model."""
         import shap
         # Extract clf and transform X if needed
@@ -192,14 +193,14 @@ class CKDModelTrainer:
             shap_values = explainer(X_df)
             return explainer, shap_values, X_df
 
-    def find_similar_patients(self, X_train, y_train, input_row, n=5):
+    def find_similar_patients(self, X_train: pd.DataFrame, y_train: pd.Series, input_row: pd.DataFrame, n: int = 5) -> Tuple[pd.DataFrame, pd.Series, np.ndarray]:
         """Find n most similar patients using euclidean distance."""
         from sklearn.metrics.pairwise import euclidean_distances
         dist = euclidean_distances(X_train.values, input_row.values)
         closest_idx = np.argsort(dist.ravel())[:n]
         return X_train.iloc[closest_idx], y_train.iloc[closest_idx], dist.ravel()[closest_idx]
 
-    def compute_counterfactual(self, model, input_row):
+    def compute_counterfactual(self, model: Any, input_row: pd.DataFrame) -> Tuple[float, Dict[str, float]]:
         """What-if: change one feature at a time, measure risk change."""
         base_prob = model.predict_proba(input_row)[0, 1]
         mods = {"SystolicBP": -20, "DiastolicBP": -10, "FastingBloodSugar": -20,
@@ -213,7 +214,7 @@ class CKDModelTrainer:
                 results[f"{feat} ({delta:+g})"] = model.predict_proba(temp)[0, 1] - base_prob
         return base_prob, results
 
-    def get_grouped_shap(self, shap_values, feature_names):
+    def get_grouped_shap(self, shap_values: Any, feature_names: List[str]) -> Dict[str, float]:
         """Compute average absolute SHAP per feature group."""
         groups = {
             "Lifestyle": ["BMI", "PhysicalActivity", "DietQuality", "SleepQuality", "Smoking"],
@@ -231,7 +232,7 @@ class CKDModelTrainer:
             result[gname] = total
         return result
 
-    def run_stability_check_multi(self, X, y, n_runs=5):
+    def run_stability_check_multi(self, X: pd.DataFrame, y: pd.Series, n_runs: int = 5) -> List[float]:
         """Run model across multiple splits to check stability."""
         from sklearn.model_selection import StratifiedShuffleSplit
         scores = []
@@ -246,7 +247,7 @@ class CKDModelTrainer:
             scores.append(balanced_accuracy_score(y_te, pipe.predict(X_te)))
         return scores
 
-    def get_error_analysis(self, model, X_test, y_test):
+    def get_error_analysis(self, model: Any, X_test: pd.DataFrame, y_test: pd.Series) -> Dict[str, Any]:
         """Analyze FP, FN, TP, TN patterns."""
         y_pred = model.predict(X_test)
         fp_mask = (y_test.values == 0) & (y_pred == 1)
@@ -260,7 +261,7 @@ class CKDModelTrainer:
             "y_pred": y_pred
         }
 
-    def get_patient_shap_highlights(self, shap_values, feature_names, patient_idx=0, top_n=10):
+    def get_patient_shap_highlights(self, shap_values: Any, feature_names: List[str], patient_idx: int = 0, top_n: int = 10) -> pd.DataFrame:
         """Extracts top_n features with highest absolute SHAP impact for a patient."""
         sv = shap_values[1] if isinstance(shap_values, list) else shap_values
         # Handle SHAP .values or array
@@ -274,7 +275,7 @@ class CKDModelTrainer:
         return df.sort_values('AbsImpact', ascending=False).head(top_n).drop(columns=['AbsImpact'])
 
     # ── OPTUNA HYPERPARAMETER TUNING ──────────────────────────
-    def tune_with_optuna(self, X_train, y_train, X_test, y_test, n_trials=50):
+    def tune_with_optuna(self, X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame, y_test: pd.Series, n_trials: int = 50) -> Dict[str, Any]:
         """Hyperparameter tuning with Optuna for top models."""
         import optuna
         optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -378,8 +379,7 @@ class CKDModelTrainer:
         return results
 
     # ── RISK TIMELINE SIMULATION ──────────────────────────────
-    def simulate_risk_progression(self, model, patient_data, feature_cols, years=5,
-                                  scenario="no_intervention"):
+    def simulate_risk_progression(self, model: Any, patient_data: pd.DataFrame, feature_cols: List[str], years: int = 5, scenario: str = "no_intervention") -> pd.DataFrame:
         """Simulate patient risk over time with annual feature changes.
         
         Scenarios:
@@ -419,8 +419,7 @@ class CKDModelTrainer:
 
     # ── MODEL SAVING FOR API ──────────────────────────────────
     @staticmethod
-    def save_model_for_api(model, feature_names, model_name, threshold,
-                           output_dir="saved_models"):
+    def save_model_for_api(model: Any, feature_names: List[str], model_name: str, threshold: float, output_dir: str = "saved_models") -> str:
         """Save trained model and metadata for the FastAPI endpoint."""
         import joblib, os
         os.makedirs(output_dir, exist_ok=True)
