@@ -405,7 +405,8 @@ if t_optuna:
 
 if t_timeline:
     with t_timeline:
-# Removed redundant auto-save to improve performance. Use the sidebar button instead.
+        app_tabs.render_risk_timeline(X_te_nl, trained_nl, best_name, trainer, viz)
+
 
 st.markdown("---")
 st.caption("CKD Intelligence v3.3 — Precision Research Dashboard with Stage Prediction, Optuna Tuning & Risk Timeline.")

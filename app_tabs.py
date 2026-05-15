@@ -328,6 +328,56 @@ def render_patient_diagnosis(X_te_nl: pd.DataFrame, trained_nl: Dict, best_name:
         # SHAP Waterfall
         st.subheader("📊 Feature Contribution Analysis")
         st.pyplot(viz.plot_local_shap(explainer, shap_values, X_df, patient_idx=0))
+        
+        # --- DYNAMIC TREATMENT SIMULATOR ---
+        st.markdown("---")
+        st.subheader("🎨 Dynamic Treatment Simulator")
+        st.info("Simulate how lifestyle changes and medical interventions might affect the patient's risk in 6 months.")
+        
+        with st.expander("🛠️ Configure Treatment Plan"):
+            cs1, cs2 = st.columns(2)
+            with cs1:
+                bp_change = st.slider("Reduce Systolic BP by (mmHg)", 0, 40, 10, key="sim_bp")
+                diet_change = st.slider("Improve Diet Quality by (points)", 0, 5, 2, key="sim_diet")
+            with cs2:
+                act_change = st.slider("Increase Activity by (min/week)", 0, 150, 60, key="sim_act")
+                bmi_change = st.slider("Reduce BMI by", 0.0, 5.0, 2.0, key="sim_bmi")
+                
+        # Calculate new values
+        sim_row = input_row.copy()
+        sim_row["SystolicBP"] = max(90, sim_row["SystolicBP"].values[0] - bp_change)
+        sim_row["DietQuality"] = min(10, sim_row["DietQuality"].values[0] + diet_change)
+        sim_row["PhysicalActivity"] = min(300, sim_row["PhysicalActivity"].values[0] + act_change)
+        sim_row["BMI"] = max(15.0, sim_row["BMI"].values[0] - bmi_change)
+        
+        sim_prob = trained_nl[best_name].predict_proba(sim_row)[0, 1]
+        sim_assessment = trainer.get_clinical_assessment(sim_prob)
+        
+        # Display comparison
+        cc1, cc2 = st.columns(2)
+        with cc1:
+            st.markdown(f"""
+                <div class='glass-card' style='text-align: center;'>
+                    <h4>Current Risk</h4>
+                    <h2 style='color: {assessment["Color"]};'>{prob:.1%}</h2>
+                    <p>{assessment["Level"]}</p>
+                </div>
+            """, unsafe_allow_html=True)
+        with cc2:
+            st.markdown(f"""
+                <div class='glass-card' style='text-align: center; border-color: #4D96FF;'>
+                    <h4>Simulated Risk (6 Months)</h4>
+                    <h2 style='color: {sim_assessment["Color"]};'>{sim_prob:.1%}</h2>
+                    <p>{sim_assessment["Level"]}</p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        prob_reduction = prob - sim_prob
+        if prob_reduction > 0:
+            st.success(f"🎉 This treatment plan could reduce the patient's risk by **{prob_reduction:.1%}**!")
+        else:
+            st.info("The selected changes do not significantly reduce the predicted risk in this model.")
+
 
 def render_batch_diagnosis(X_te_nl: pd.DataFrame, trained_nl: Dict, best_name: str, best_th: float, trainer: Any):
     st.header("📂 Batch Patient Diagnosis")
