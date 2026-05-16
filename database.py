@@ -18,8 +18,10 @@ class PatientRecord(Base):
     features = Column(JSON) # Store raw features for future reference
     timestamp = Column(DateTime, default=datetime.utcnow)
 
-# Using SQLite for simplicity in this demo, could easily be postgresql://user:pass@localhost/db
-engine = create_engine('sqlite:///ckd_patients.db', connect_args={'check_same_thread': False})
+# Using SQLite for simplicity in this demo
+DB_DIR = "data"
+os.makedirs(DB_DIR, exist_ok=True)
+engine = create_engine(f'sqlite:///{DB_DIR}/ckd_patients.db', connect_args={'check_same_thread': False})
 Base.metadata.create_all(engine)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
