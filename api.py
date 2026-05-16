@@ -213,6 +213,61 @@ def predict_batch(patients: List[PatientInput]) -> Dict[str, Any]:
     return {"predictions": results, "count": len(results)}
 
 
+@app.post("/predict/fhir", tags=["Prediction", "EMR"])
+def predict_fhir(patient: PatientInput) -> Dict[str, Any]:
+    """Predict CKD risk and return a FHIR-compliant JSON bundle for EMR integration."""
+    if MODEL is None:
+        raise HTTPException(status_code=503, detail="Model not loaded.")
+
+    # Predict
+    patient_dict = patient.model_dump()
+    input_df = pd.DataFrame([patient_dict])
+    for feat in FEATURE_NAMES:
+        if feat not in input_df.columns:
+            input_df[feat] = 0
+    input_df = input_df[FEATURE_NAMES]
+    
+    prob = float(MODEL.predict_proba(input_df)[0, 1])
+    assessment = get_assessment(prob)
+    
+    # Generate FHIR Bundle
+    fhir_bundle = {
+        "resourceType": "Bundle",
+        "type": "collection",
+        "entry": [
+            {
+                "resource": {
+                    "resourceType": "Patient",
+                    "gender": "male" if patient.Gender == 1 else "female",
+                    "active": True
+                }
+            },
+            {
+                "resource": {
+                    "resourceType": "RiskAssessment",
+                    "status": "final",
+                    "code": {
+                        "coding": [{
+                            "system": "http://snomed.info/sct",
+                            "code": "709044004",
+                            "display": "Chronic kidney disease risk assessment"
+                        }]
+                    },
+                    "prediction": [{
+                        "probabilityDecimal": round(prob, 4),
+                        "qualitativeRisk": {
+                            "text": assessment["level"]
+                        }
+                    }],
+                    "mitigation": assessment["action"]
+                }
+            }
+        ]
+    }
+    
+    return fhir_bundle
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)

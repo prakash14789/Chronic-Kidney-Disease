@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import datetime
+import json
 import plotly.express as px
+from database import save_patient_record, get_patient_history
 from sklearn.metrics import balanced_accuracy_score, f1_score, precision_score, recall_score
 from typing import Any, Dict, List, Tuple
 
@@ -297,6 +299,48 @@ def render_patient_diagnosis(X_te_nl: pd.DataFrame, trained_nl: Dict, best_name:
                     )
                 st.success("Report ready for download!")
 
+        col_a, col_b = st.columns(2)
+        with col_a:
+            patient_id_input = st.text_input("Patient ID (for history)", value=f"PAT-{int(datetime.datetime.now().timestamp())}")
+            if st.button("💾 Save to Patient History", use_container_width=True):
+                # Save to sqlite
+                features_dict = {col: float(input_row[col].values[0]) for col in input_row.columns}
+                save_patient_record(
+                    patient_id=patient_id_input,
+                    age=float(age),
+                    gender=gender,
+                    risk_score=float(prob),
+                    risk_level=assessment["Level"],
+                    clinical_action=assessment["Action"],
+                    features=features_dict
+                )
+                st.success(f"Saved patient {patient_id_input} to history database!")
+        
+        with col_b:
+            st.markdown("<br>", unsafe_allow_html=True)
+            # FHIR EMR Export
+            fhir_bundle = {
+                "resourceType": "Bundle",
+                "type": "collection",
+                "entry": [
+                    {"resource": {"resourceType": "Patient", "id": patient_id_input, "gender": "male" if gender == "Male" else "female", "active": True}},
+                    {"resource": {
+                        "resourceType": "RiskAssessment",
+                        "status": "final",
+                        "code": {"coding": [{"system": "http://snomed.info/sct", "code": "709044004", "display": "Chronic kidney disease risk assessment"}]},
+                        "prediction": [{"probabilityDecimal": float(prob), "qualitativeRisk": {"text": assessment["Level"]}}],
+                        "mitigation": assessment["Action"]
+                    }}
+                ]
+            }
+            st.download_button(
+                label="📥 Export to EMR (FHIR JSON)",
+                data=json.dumps(fhir_bundle, indent=2),
+                file_name=f"fhir_{patient_id_input}.json",
+                mime="application/json",
+                use_container_width=True
+            )
+
         st.markdown("---")
         
         # Counterfactual What-If
@@ -404,6 +448,15 @@ def render_batch_diagnosis(X_te_nl: pd.DataFrame, trained_nl: Dict, best_name: s
             batch_df["CKD_Prediction"] = preds
             batch_df["Risk_Level"] = [trainer.get_clinical_assessment(p)["Level"] for p in probs]
             
+            # Rank patients by risk probability
+            batch_df = batch_df.sort_values(by="CKD_Risk_Score", ascending=False).reset_index(drop=True)
+            
+            st.subheader("🚨 High-Risk Patient Registry")
+            high_risk_df = batch_df[batch_df["Risk_Level"] == "High Risk"]
+            st.warning(f"Found {len(high_risk_df)} High-Risk patients requiring immediate attention.")
+            st.dataframe(high_risk_df, use_container_width=True)
+
+            st.subheader("All Patients")
             st.dataframe(batch_df, use_container_width=True)
             
             col1, col2 = st.columns(2)
@@ -637,3 +690,38 @@ def render_risk_timeline(X_te_nl: pd.DataFrame, trained_nl: Dict, best_name: str
             'Level (With Intervention)': timeline_yes['Risk_Level'],
         })
         st.dataframe(comparison, use_container_width=True)
+
+def render_patient_history(viz: Any):
+    st.header("📚 Patient History Tracking")
+    st.info("Query historical risk assessments for a patient across multiple visits.")
+    
+    patient_id = st.text_input("Enter Patient ID to Search (e.g. PAT-12345)")
+    if st.button("Search History"):
+        if not patient_id:
+            st.warning("Please enter a Patient ID.")
+            return
+            
+        records = get_patient_history(patient_id)
+        if not records:
+            st.info(f"No records found for Patient ID: {patient_id}")
+            return
+            
+        st.success(f"Found {len(records)} visit records for {patient_id}")
+        
+        # Prepare dataframe for plotting
+        history_df = pd.DataFrame([{
+            'Date': r.timestamp,
+            'Risk Score': r.risk_score,
+            'Risk Level': r.risk_level,
+            'Age': r.age
+        } for r in records])
+        
+        # Plot risk over time
+        fig = px.line(history_df, x='Date', y='Risk Score', markers=True, title=f"CKD Risk Trajectory for {patient_id}")
+        fig.update_layout(yaxis_tickformat='.1%')
+        fig.update_traces(line_color='#4361EE', marker=dict(size=10, color='#FF6B6B'))
+        st.plotly_chart(viz._apply_dark_theme(fig), use_container_width=True)
+        
+        # Display table
+        st.subheader("Visit Log")
+        st.dataframe(history_df, use_container_width=True)

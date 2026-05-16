@@ -304,13 +304,13 @@ if st.session_state['role'] == "admin":
         "📊 Data Audit", "🚀 Exp 1 (Full)", "🛡️ Exp 2 (No-Leakage)", "📉 Comparison",
         "🧬 SMOTE Insights", "🎯 Threshold Tuning", "🧠 SHAP Interpretation", "🔬 Deep Analysis",
         "🏥 Patient Diagnosis", "📂 Batch Diagnosis",
-        "🏗️ CKD Staging", "⚡ Optuna Tuning", "📈 Risk Timeline"
+        "🏗️ CKD Staging", "⚡ Optuna Tuning", "📈 Risk Timeline", "📚 Patient History"
     ])
     (t_audit, t_exp1, t_exp2, t_comp, t_smote, t_th, t_shap, t_deep,
-     t_diag, t_batch, t_stage, t_optuna, t_timeline) = tabs
+     t_diag, t_batch, t_stage, t_optuna, t_timeline, t_history) = tabs
 else:
-    tabs = st.tabs(["🏥 Patient Diagnosis", "📂 Batch Diagnosis"])
-    t_diag, t_batch = tabs
+    tabs = st.tabs(["🏥 Patient Diagnosis", "📂 Batch Diagnosis", "📚 Patient History"])
+    t_diag, t_batch, t_history = tabs
     t_audit = t_exp1 = t_exp2 = t_comp = t_smote = t_th = t_shap = t_deep = None
     t_stage = t_optuna = t_timeline = None
 
@@ -406,6 +406,10 @@ if t_optuna:
 if t_timeline:
     with t_timeline:
         app_tabs.render_risk_timeline(X_te_nl, trained_nl, best_name, trainer, viz)
+
+if t_history:
+    with t_history:
+        app_tabs.render_patient_history(viz)
 
 
 st.markdown("---")
