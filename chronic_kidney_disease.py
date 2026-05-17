@@ -492,7 +492,7 @@ print("[14] → Saved: precision_recall_f1.png")
 
 # ── DONE ──────────────────────────────────────────────────
 print("\n" + "=" * 62)
-print(f"  PIPELINE COMPLETE")
+print("  PIPELINE COMPLETE")
 print(f"  Best model (Full Features) : {best_name}")
 print(f"  Best model (No-Leakage)    : {best_name_nl}")
 print("  Output files:")

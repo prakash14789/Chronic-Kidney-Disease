@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit as st
 from data_processor import CKDDataProcessor
 from model_trainer import CKDModelTrainer
 from visualizer import CKDVisualizer, COLORS

@@ -1,7 +1,5 @@
 from fpdf import FPDF
 import datetime
-import pandas as pd
-import numpy as np
 import os
 
 class CKDReportGenerator:

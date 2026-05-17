@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 import numpy as np
 import sys

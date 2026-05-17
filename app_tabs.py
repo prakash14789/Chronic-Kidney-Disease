@@ -66,26 +66,26 @@ def render_smote_insights(res_nl: pd.DataFrame, res_no_smote: pd.DataFrame):
     
     sc1, sc2 = st.columns(2)
     with sc1:
-        st.markdown(f"""
+        st.markdown("""
         <div class='glass-card'>
         <h4>1. The Accuracy Trap</h4>
         <p>With a 92% majority class, a model that guesses 'Sick' for everyone is 92% accurate but useless. SMOTE forces the model to learn the harder 8% (Healthy), which naturally drops the 'easy' accuracy score.</p>
         </div>
         """, unsafe_allow_html=True)
-        st.markdown(f"""
+        st.markdown("""
         <div class='glass-card'>
         <h4>2. Redundancy</h4>
         <p>Your models already use <strong>class_weight='balanced'</strong>. Adding SMOTE on top can be overkill, making the model over-sensitive to the minority class and increasing False Positives.</p>
         </div>
         """, unsafe_allow_html=True)
     with sc2:
-        st.markdown(f"""
+        st.markdown("""
         <div class='glass-card'>
         <h4>3. Boundary Blurring</h4>
         <p>SMOTE creates points by drawing lines between existing ones. If Healthy and Sick patients have overlapping features, SMOTE creates 'synthetic noise' in the overlap, confusing the model.</p>
         </div>
         """, unsafe_allow_html=True)
-        st.markdown(f"""
+        st.markdown("""
         <div class='glass-card'>
         <h4>4. The Trade-off</h4>
         <p>SMOTE is used to improve <strong>Minority Recall</strong> (finding healthy people). We often accept a drop in Precision or Accuracy to ensure the model isn't just ignoring the minority group.</p>
