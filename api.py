@@ -8,9 +8,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
+from contextlib import asynccontextmanager
 import joblib
 import pandas as pd
-import numpy as np
 import os
 import logging
 
@@ -18,12 +18,22 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    loaded = load_models()
+    if loaded:
+        logger.info(f"✅ Model loaded with {len(FEATURE_NAMES)} features")
+    else:
+        logger.warning("⚠️  No saved model found. Run the Streamlit app first and click 'Save Model for API'.")
+    yield
+
 app = FastAPI(
     title="CKD Clinical Intelligence API",
     description="REST API for Chronic Kidney Disease risk prediction powered by ML",
     version="3.2",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -103,7 +113,6 @@ def load_models() -> bool:
     global MODEL, FEATURE_NAMES
     model_path = os.path.join(MODEL_DIR, "best_model.pkl")
     features_path = os.path.join(MODEL_DIR, "feature_names.pkl")
-    meta_path = os.path.join(MODEL_DIR, "model_meta.pkl")
 
     if os.path.exists(model_path) and os.path.exists(features_path):
         MODEL = joblib.load(model_path)
@@ -113,13 +122,8 @@ def load_models() -> bool:
 
 
 # ── Events ─────────────────────────────────────────────────
-@app.on_event("startup")
-def startup() -> None:
-    loaded = load_models()
-    if loaded:
-        logger.info(f"✅ Model loaded with {len(FEATURE_NAMES)} features")
-    else:
-        logger.warning("⚠️  No saved model found. Run the Streamlit app first and click 'Save Model for API'.")
+# Migrated to lifespan event handler above
+
 
 
 # ── Endpoints ──────────────────────────────────────────────

@@ -1,7 +1,5 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-import datetime
+import streamlit as st
 from data_processor import CKDDataProcessor
 from model_trainer import CKDModelTrainer
 from visualizer import CKDVisualizer, COLORS
@@ -214,20 +212,6 @@ with st.sidebar:
     st.markdown("[🔗 View Source on GitHub](https://github.com/prakash14789/Chronic-Kidney-Disease)")
     st.success("v3.3 Research Pipeline Active")
     st.divider()
-    # Model saving for API
-    if st.session_state.get('role') == 'admin':
-        if st.button("💾 Save Model for API", use_container_width=True):
-            try:
-                path = trainer.save_model_for_api(
-                    trained_nl[best_name] if 'trained_nl' in dir() else None,
-                    X_te_nl.columns if 'X_te_nl' in dir() else [],
-                    best_name if 'best_name' in dir() else 'unknown',
-                    best_th if 'best_th' in dir() else 0.5
-                )
-                st.success(f"Model saved to {path}")
-            except Exception as e:
-                st.error(f"Save failed: {e}")
-    st.divider()
     if st.button("🚪 Logout", use_container_width=True):
         st.session_state['logged_in'] = False
         st.session_state['role'] = None
@@ -273,6 +257,22 @@ def run_full_pipeline(sample_n, use_cv=False):
 best_name = res_nl.iloc[0]["Model"]
 y_proba_all = trained_nl[best_name].predict_proba(X_te_nl)[:, 1]
 ckd_pct = df_full['Diagnosis'].mean() * 100
+
+with st.sidebar:
+    if st.session_state.get('role') == 'admin':
+        st.divider()
+        if st.button("💾 Save Model for API", use_container_width=True):
+            try:
+                path = trainer.save_model_for_api(
+                    trained_nl[best_name],
+                    X_te_nl.columns,
+                    best_name,
+                    best_th
+                )
+                st.success(f"Model saved to {path}")
+            except Exception as e:
+                st.error(f"Save failed: {e}")
+
 
 # --- KPI CARDS ---
 st.markdown("<h1 style='text-align: center; margin-bottom: 30px; font-weight: 800; letter-spacing: -0.05em;'>🧬 CKD Clinical Intelligence</h1>", unsafe_allow_html=True)
@@ -347,7 +347,7 @@ if t_shap:
 
 if t_deep:
     with t_deep:
-        app_tabs.render_deep_analysis(df_sample, y_te_f, y_proba_all, trained_nl, best_name, X_te_nl, y_tr_f, trainer, viz)
+        app_tabs.render_deep_analysis(df_sample, y_te_f, y_proba_all, trained_nl, best_name, X_te_nl, X_tr_nl, y_tr_f, trainer, viz)
 
 if t_diag:
     with t_diag:

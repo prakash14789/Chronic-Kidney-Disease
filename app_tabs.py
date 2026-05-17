@@ -6,8 +6,7 @@ import json
 import plotly.express as px
 from database import save_patient_record, get_patient_history
 from sklearn.metrics import balanced_accuracy_score, f1_score, precision_score, recall_score
-from typing import Any, Dict, List, Tuple
-
+from typing import Any, Dict
 def render_data_audit(df_full: pd.DataFrame, df_sample: pd.DataFrame, viz: Any, ckd_pct: float):
     st.header("1. Class Imbalance & Audit")
     col1, col2 = st.columns([1, 2])
@@ -124,7 +123,7 @@ def render_shap_interpretation(trained_nl: Dict, best_name: str, X_te_nl: pd.Dat
     st.plotly_chart(viz.plot_grouped_shap(group_imp), use_container_width=True, key="grp_shap")
     return explainer, shap_values, X_df
 
-def render_deep_analysis(df_sample: pd.DataFrame, y_te_f: pd.Series, y_proba_all: np.ndarray, trained_nl: Dict, best_name: str, X_te_nl: pd.DataFrame, y_tr_f: pd.Series, trainer: Any, viz: Any):
+def render_deep_analysis(df_sample: pd.DataFrame, y_te_f: pd.Series, y_proba_all: np.ndarray, trained_nl: Dict, best_name: str, X_te_nl: pd.DataFrame, X_tr_nl: pd.DataFrame, y_tr_f: pd.Series, trainer: Any, viz: Any):
     st.header("🔬 Deep Analysis")
 
     # 1. Feature Direction
