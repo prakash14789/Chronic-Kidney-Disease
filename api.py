@@ -271,6 +271,23 @@ def predict_fhir(patient: PatientInput) -> Dict[str, Any]:
     
     return fhir_bundle
 
+@app.post("/report/async", tags=["Reports"])
+def generate_report_async(patient: PatientInput, patient_id: str = "Unknown"):
+    """Trigger a background task to generate a complex PDF report."""
+    from tasks import generate_comprehensive_report_task
+    
+    # In a real scenario, model prediction would be generated or fetched here
+    patient_data = patient.model_dump()
+    patient_data["patient_id"] = patient_id
+    
+    # Send task to Celery
+    task = generate_comprehensive_report_task.delay(patient_data, {"mock": "prediction"})
+    
+    return {
+        "status": "Task queued",
+        "task_id": task.id,
+        "message": "Report generation is running in the background."
+    }
 
 if __name__ == "__main__":
     import uvicorn

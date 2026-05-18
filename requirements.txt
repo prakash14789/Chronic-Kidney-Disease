@@ -16,3 +16,6 @@ fastapi
 uvicorn
 joblib
 sqlalchemy
+celery
+redis
+alembic

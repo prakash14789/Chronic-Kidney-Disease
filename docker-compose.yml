@@ -25,3 +25,24 @@ services:
       - ./saved_models:/app/saved_models
     command: uvicorn api:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    container_name: ckd_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  celery_worker:
+    build: .
+    container_name: ckd_celery_worker
+    command: celery -A tasks.celery_app worker --loglevel=info
+    volumes:
+      - ./data:/app/data
+      - ./saved_models:/app/saved_models
+      - ./reports:/app/reports
+    depends_on:
+      - redis
+    restart: unless-stopped
