@@ -4,8 +4,9 @@ FastAPI endpoint for real-time CKD risk prediction.
 Run: uvicorn api:app --reload --port 8000
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
@@ -13,6 +14,9 @@ import joblib
 import pandas as pd
 import os
 import logging
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from database import log_audit_action, SessionLocal, User, verify_password
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -121,12 +125,65 @@ def load_models() -> bool:
     return False
 
 
-# ── Events ─────────────────────────────────────────────────
-# Migrated to lifespan event handler above
+# ── Auth & Security ────────────────────────────────────────
 
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "super-secret-jwt-key-demo")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        user_id: int = payload.get("id")
+        if username is None or user_id is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    
+    db = SessionLocal()
+    user = db.query(User).filter(User.username == username).first()
+    db.close()
+    if user is None:
+        raise credentials_exception
+    return user
 
 
 # ── Endpoints ──────────────────────────────────────────────
+
+@app.post("/token", tags=["Auth"])
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    db = SessionLocal()
+    user = db.query(User).filter(User.username == form_data.username).first()
+    db.close()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username, "id": user.id}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 @app.get("/health", response_model=HealthResponse, tags=["System"])
 def health_check() -> HealthResponse:
     """Check API health and model status."""
@@ -144,7 +201,7 @@ def health_check() -> HealthResponse:
 
 
 @app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
-def predict(patient: PatientInput) -> PredictionResponse:
+def predict(patient: PatientInput, current_user: User = Depends(get_current_user)) -> PredictionResponse:
     """Predict CKD risk for a single patient."""
     if MODEL is None:
         raise HTTPException(
@@ -171,6 +228,9 @@ def predict(patient: PatientInput) -> PredictionResponse:
     meta_path = os.path.join(MODEL_DIR, "model_meta.pkl")
     meta = joblib.load(meta_path) if os.path.exists(meta_path) else {}
 
+    # Audit log
+    log_audit_action(current_user.id, "PREDICT_RISK", "Unknown", f"Risk Score: {prob:.4f}")
+
     return PredictionResponse(
         risk_score=round(prob, 4),
         risk_percentage=f"{prob:.1%}",
@@ -183,7 +243,7 @@ def predict(patient: PatientInput) -> PredictionResponse:
 
 
 @app.post("/predict/batch", tags=["Prediction"])
-def predict_batch(patients: List[PatientInput]) -> Dict[str, Any]:
+def predict_batch(patients: List[PatientInput], current_user: User = Depends(get_current_user)) -> Dict[str, Any]:
     """Predict CKD risk for multiple patients at once."""
     if MODEL is None:
         raise HTTPException(status_code=503, detail="Model not loaded.")
@@ -214,11 +274,14 @@ def predict_batch(patients: List[PatientInput]) -> Dict[str, Any]:
             "clinical_action": assessment["action"]
         })
 
+    # Audit log
+    log_audit_action(current_user.id, "PREDICT_BATCH", "BATCH", f"Processed {len(results)} patients")
+
     return {"predictions": results, "count": len(results)}
 
 
 @app.post("/predict/fhir", tags=["Prediction", "EMR"])
-def predict_fhir(patient: PatientInput) -> Dict[str, Any]:
+def predict_fhir(patient: PatientInput, current_user: User = Depends(get_current_user)) -> Dict[str, Any]:
     """Predict CKD risk and return a FHIR-compliant JSON bundle for EMR integration."""
     if MODEL is None:
         raise HTTPException(status_code=503, detail="Model not loaded.")
@@ -269,10 +332,13 @@ def predict_fhir(patient: PatientInput) -> Dict[str, Any]:
         ]
     }
     
+    # Audit log
+    log_audit_action(current_user.id, "PREDICT_FHIR", "Unknown", f"Generated FHIR Bundle. Risk: {prob:.4f}")
+
     return fhir_bundle
 
 @app.post("/report/async", tags=["Reports"])
-def generate_report_async(patient: PatientInput, patient_id: str = "Unknown"):
+def generate_report_async(patient: PatientInput, patient_id: str = "Unknown", current_user: User = Depends(get_current_user)):
     """Trigger a background task to generate a complex PDF report."""
     from tasks import generate_comprehensive_report_task
     
@@ -282,6 +348,9 @@ def generate_report_async(patient: PatientInput, patient_id: str = "Unknown"):
     
     # Send task to Celery
     task = generate_comprehensive_report_task.delay(patient_data, {"mock": "prediction"})
+    
+    # Audit log
+    log_audit_action(current_user.id, "EXPORT_PDF_ASYNC", patient_id, f"Task ID: {task.id}")
     
     return {
         "status": "Task queued",

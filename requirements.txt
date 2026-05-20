@@ -19,3 +19,8 @@ sqlalchemy
 celery
 redis
 alembic
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
+sqlalchemy-utils
+cryptography
