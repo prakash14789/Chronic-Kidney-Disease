@@ -6,8 +6,15 @@ import os
 # Add the parent directory to sys.path to import api
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from api import app
+from api import app, get_current_user
 import api
+from database import User
+
+# Override dependency to simulate logged in user
+def override_get_current_user():
+    return User(id=1, username="test_admin", role="admin")
+
+app.dependency_overrides[get_current_user] = override_get_current_user
 
 client = TestClient(app)
 
