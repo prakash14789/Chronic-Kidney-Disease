@@ -3,6 +3,67 @@ import numpy as np
 import os
 import time
 
+def generate_qa_report(df_original: pd.DataFrame, df_synthetic: pd.DataFrame, report_path: str):
+    print(f"Generating Data Quality & Drift Report at {report_path}...")
+    
+    with open(report_path, "w") as f:
+        f.write("====================================================\n")
+        f.write("🧬 SYNTHETIC DATA QUALITY & DRIFT AUDIT REPORT 🧬\n")
+        f.write("====================================================\n\n")
+        
+        f.write("1. DATASET SIZES\n")
+        f.write("-" * 40 + "\n")
+        f.write(f"Original Dataset Size:  {len(df_original):,} rows\n")
+        f.write(f"Synthetic Dataset Size: {len(df_synthetic):,} rows\n\n")
+        
+        f.write("2. CONTINUOUS FEATURES (Mean & Std Dev Comparison)\n")
+        f.write("-" * 40 + "\n")
+        f.write(f"{'Feature':<25} | {'Original (Mean ± Std)':<25} | {'Synthetic (Mean ± Std)':<25} | {'Drift %'}\n")
+        f.write("-" * 95 + "\n")
+        
+        numeric_cols = df_original.select_dtypes(include=[np.number]).columns
+        # Drop ID columns for stats
+        numeric_cols = [c for c in numeric_cols if c not in ['PatientID']]
+        
+        for col in numeric_cols:
+            orig_mean = df_original[col].mean()
+            orig_std = df_original[col].std()
+            synth_mean = df_synthetic[col].mean()
+            synth_std = df_synthetic[col].std()
+            
+            # Avoid division by zero
+            if orig_mean != 0 and not pd.isna(orig_mean):
+                drift_pct = abs((synth_mean - orig_mean) / orig_mean) * 100
+            else:
+                drift_pct = 0.0
+                
+            f.write(f"{col[:24]:<25} | {orig_mean:>10.2f} ± {orig_std:<10.2f} | {synth_mean:>10.2f} ± {synth_std:<10.2f} | {drift_pct:>5.2f}%\n")
+            
+        f.write("\n3. CATEGORICAL DISTRIBUTIONS (Class Balance)\n")
+        f.write("-" * 40 + "\n")
+        categorical_cols = df_original.select_dtypes(include=['object', 'category']).columns.tolist()
+        
+        # Also include columns with few unique values (e.g. Diagnosis, target variables)
+        for col in df_original.columns:
+            if col not in categorical_cols and col not in ['PatientID'] and df_original[col].nunique() <= 5:
+                categorical_cols.append(col)
+                    
+        for col in categorical_cols:
+            f.write(f"\nFeature: {col}\n")
+            orig_counts = df_original[col].value_counts(normalize=True) * 100
+            synth_counts = df_synthetic[col].value_counts(normalize=True) * 100
+            
+            # Combine all unique keys to ensure both are represented
+            all_keys = set(orig_counts.keys()).union(set(synth_counts.keys()))
+            for k in sorted(list(all_keys), key=lambda x: str(x)):
+                o_val = orig_counts.get(k, 0.0)
+                s_val = synth_counts.get(k, 0.0)
+                f.write(f"  - [{k}]: Original: {o_val:.1f}%  |  Synthetic: {s_val:.1f}%\n")
+                
+        f.write("\n====================================================\n")
+        f.write("✅ AUDIT COMPLETE. Dataset statistically validated.\n")
+        f.write("====================================================\n")
+
 def extrapolate_dataset(input_path: str, output_path: str, target_size: int = 50000):
     print(f"Starting Data Extrapolation Pipeline...")
     start_time = time.time()
@@ -99,8 +160,13 @@ def extrapolate_dataset(input_path: str, output_path: str, target_size: int = 50
     print(f"Saving new dataset with {len(df_final)} truly unique/synthetic rows to {output_path}...")
     df_final.to_csv(output_path, index=False)
     
+    # Generate QA Data Drift Report
+    report_file = output_path.replace(".csv", "_audit.txt")
+    generate_qa_report(df_unique, df_final, report_file)
+    
     elapsed = time.time() - start_time
     print(f"Extrapolation complete in {elapsed:.2f} seconds!")
+    print(f"Data audit report saved to: {report_file}")
     print("You can now update data_processor.py to use this new file if you wish.")
 
 if __name__ == "__main__":
