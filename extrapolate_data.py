@@ -86,10 +86,6 @@ def extrapolate_dataset(input_path: str, output_path: str, target_size: int = 50
         print("Unique rows already exceed target size. No need to extrapolate.")
         return
 
-    # Calculate how many new rows we need to generate
-    num_to_generate = target_size - unique_size
-    print(f"Generating {num_to_generate} brand new synthetic patient records...")
-    
     # Separate features by type
     categorical_cols = df_unique.select_dtypes(include=['object', 'category']).columns.tolist()
     # also consider features with very few unique values as categorical
@@ -99,9 +95,32 @@ def extrapolate_dataset(input_path: str, output_path: str, target_size: int = 50
             
     continuous_cols = [c for c in df_unique.columns if c not in categorical_cols and c not in ['PatientID']]
     
-    # 3. Generate synthetic data
-    # We will randomly sample from the unique rows with replacement, and then add realistic "jitter" (noise)
-    synthetic_samples = df_unique.sample(n=num_to_generate, replace=True).copy()
+    # 3. Generate synthetic data using True Class Balancing
+    print(f"Applying True Class Balancing for a perfectly balanced {target_size}-row dataset...")
+    
+    if 'Diagnosis' in df_unique.columns:
+        target_per_class = target_size // 2
+        
+        class_0_df = df_unique[df_unique['Diagnosis'] == 0]
+        class_1_df = df_unique[df_unique['Diagnosis'] == 1]
+        
+        need_class_0 = max(0, target_per_class - len(class_0_df))
+        need_class_1 = max(0, target_per_class - len(class_1_df))
+        
+        print(f"Targeting {target_per_class} rows per class.")
+        print(f"Generating {need_class_0} synthetic rows for Class 0 (No CKD).")
+        print(f"Generating {need_class_1} synthetic rows for Class 1 (CKD).")
+        
+        synth_0 = class_0_df.sample(n=need_class_0, replace=True) if need_class_0 > 0 else pd.DataFrame()
+        synth_1 = class_1_df.sample(n=need_class_1, replace=True) if need_class_1 > 0 else pd.DataFrame()
+        
+        synthetic_samples = pd.concat([synth_0, synth_1]).copy()
+        num_to_generate = len(synthetic_samples)
+    else:
+        # Fallback if Diagnosis column is not found
+        num_to_generate = max(0, target_size - unique_size)
+        print(f"Target column 'Diagnosis' not found. Generating {num_to_generate} random synthetic records...")
+        synthetic_samples = df_unique.sample(n=num_to_generate, replace=True).copy()
     
     # Add statistical jitter to continuous columns (e.g. +- 2% of standard deviation)
     # This makes the numbers unique but clinically identical in meaning
