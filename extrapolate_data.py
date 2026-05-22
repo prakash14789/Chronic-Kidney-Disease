@@ -122,20 +122,46 @@ def extrapolate_dataset(input_path: str, output_path: str, target_size: int = 50
         print(f"Target column 'Diagnosis' not found. Generating {num_to_generate} random synthetic records...")
         synthetic_samples = df_unique.sample(n=num_to_generate, replace=True).copy()
     
-    # Add statistical jitter to continuous columns (e.g. +- 2% of standard deviation)
-    # This makes the numbers unique but clinically identical in meaning
-    for col in continuous_cols:
-        std_dev = df_unique[col].std()
-        if pd.isna(std_dev) or std_dev == 0:
-            continue
-            
-        # Add random normal noise: mean=0, std = 2% of the feature's standard deviation
-        noise = np.random.normal(0, std_dev * 0.02, size=num_to_generate)
-        synthetic_samples[col] = synthetic_samples[col] + noise
+    # 4. Longitudinal Extrapolation (Time-based Progression) & General Jitter
+    print("Applying Longitudinal Progression: Age +5 years, GFR -5%, SystolicBP +5 points...")
+    
+    # Handle explicit longitudinal changes for progressive disease tracking
+    if 'Age' in synthetic_samples.columns:
+        noise_age = np.random.normal(5, 1, size=num_to_generate) # +5 years
+        synthetic_samples['Age'] = synthetic_samples['Age'] + noise_age
         
+    if 'GFR' in synthetic_samples.columns:
+        noise_gfr = np.random.normal(0, synthetic_samples['GFR'].std() * 0.02, size=num_to_generate)
+        synthetic_samples['GFR'] = (synthetic_samples['GFR'] * 0.95) + noise_gfr # -5%
+        
+    if 'SystolicBP' in synthetic_samples.columns:
+        noise_sbp = np.random.normal(5, 2, size=num_to_generate) # +5 points
+        synthetic_samples['SystolicBP'] = synthetic_samples['SystolicBP'] + noise_sbp
+        
+    if 'DiastolicBP' in synthetic_samples.columns:
+        noise_dbp = np.random.normal(3, 1.5, size=num_to_generate) # Scale proportionally
+        synthetic_samples['DiastolicBP'] = synthetic_samples['DiastolicBP'] + noise_dbp
+
+    # Apply general statistical jitter to the remaining continuous columns
+    for col in continuous_cols:
+        if col not in ['Age', 'GFR', 'SystolicBP', 'DiastolicBP']:
+            std_dev = df_unique[col].std()
+            if pd.isna(std_dev) or std_dev == 0:
+                continue
+                
+            # Add random normal noise: mean=0, std = 2% of the feature's standard deviation
+            noise = np.random.normal(0, std_dev * 0.02, size=num_to_generate)
+            synthetic_samples[col] = synthetic_samples[col] + noise
+            
         # Ensure we don't create impossible values (like negative age or blood pressure)
         min_val = df_unique[col].min()
         max_val = df_unique[col].max()
+        
+        # Adjust clipping maximums to allow natural longitudinal growth
+        if col == 'Age': max_val += 10
+        elif col == 'SystolicBP': max_val += 15
+        elif col == 'DiastolicBP': max_val += 10
+        
         synthetic_samples[col] = np.clip(synthetic_samples[col], min_val, max_val)
         
         # If the original data was integers (like Age=50), keep the synthetic data as integers
