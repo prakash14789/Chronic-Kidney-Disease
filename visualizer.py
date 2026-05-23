@@ -30,12 +30,18 @@ class CKDVisualizer:
     @staticmethod
     def _apply_dark_theme(fig):
         fig.update_layout(
-            plot_bgcolor=COLORS["bg"],
-            paper_bgcolor=COLORS["bg"],
-            font=dict(color=COLORS["text"]),
-            xaxis=dict(gridcolor=COLORS["grid"], zerolinecolor=COLORS["grid"]),
-            yaxis=dict(gridcolor=COLORS["grid"], zerolinecolor=COLORS["grid"]),
-            margin=dict(l=40, r=40, t=60, b=40)
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(family='Outfit, sans-serif', color=COLORS["text"]),
+            xaxis=dict(showgrid=False, zeroline=False, showline=False),
+            yaxis=dict(showgrid=False, zeroline=False, showline=False),
+            margin=dict(l=40, r=40, t=60, b=40),
+            hoverlabel=dict(
+                bgcolor="rgba(30, 41, 59, 0.85)",
+                font_size=13,
+                font_family="Outfit, sans-serif",
+                bordercolor="rgba(67, 97, 238, 0.5)"
+            )
         )
         return fig
 
@@ -136,8 +142,9 @@ class CKDVisualizer:
     def plot_correlation_heatmap(df):
         plt.style.use('dark_background')
         fig, ax = plt.subplots(figsize=(12, 10))
-        fig.patch.set_facecolor(COLORS["bg"])
-        ax.set_facecolor(COLORS["bg"])
+        fig.patch.set_facecolor('none')
+        fig.patch.set_alpha(0.0)
+        ax.set_facecolor('none')
         
         numeric_df = df.select_dtypes(include=[np.number])
         top_cols = numeric_df.var().nlargest(20).index
@@ -166,10 +173,12 @@ class CKDVisualizer:
             'axes.labelcolor': COLORS["text"],
             'xtick.color': COLORS["text"],
             'ytick.color': COLORS["text"],
-            'axes.edgecolor': COLORS["grid"]
+            'axes.edgecolor': 'none',
+            'font.family': 'sans-serif'
         })
         for ax in fig.get_axes():
-            ax.set_facecolor(COLORS["bg"])
+            ax.set_facecolor('none')
+            ax.grid(False)
             ax.tick_params(axis='both', which='both', colors=COLORS["text"], labelsize=10)
             ax.xaxis.label.set_color(COLORS["text"])
             ax.yaxis.label.set_color(COLORS["text"])
@@ -184,7 +193,8 @@ class CKDVisualizer:
     def plot_shap_summary(explainer, shap_values, X_df, model_name):
         plt.style.use('dark_background')
         fig = plt.figure(figsize=(10, 6))
-        fig.patch.set_facecolor(COLORS["bg"])
+        fig.patch.set_facecolor('none')
+        fig.patch.set_alpha(0.0)
         sv = shap_values[1] if isinstance(shap_values, list) else shap_values
         shap.summary_plot(sv, X_df, show=False, plot_type="dot")
         plt.title(f"SHAP Summary — {model_name}", color=COLORS["text"], pad=25, fontsize=14)
@@ -194,7 +204,8 @@ class CKDVisualizer:
     def plot_shap_bar(explainer, shap_values, X_df, model_name):
         plt.style.use('dark_background')
         fig = plt.figure(figsize=(10, 6))
-        fig.patch.set_facecolor(COLORS["bg"])
+        fig.patch.set_facecolor('none')
+        fig.patch.set_alpha(0.0)
         sv = shap_values[1] if isinstance(shap_values, list) else shap_values
         shap.summary_plot(sv, X_df, show=False, plot_type="bar")
         plt.title(f"SHAP Feature Importance — {model_name}", color=COLORS["text"], pad=25, fontsize=14)
@@ -204,7 +215,8 @@ class CKDVisualizer:
     def plot_local_shap(explainer, shap_values, X_df, patient_idx=0):
         plt.style.use('dark_background')
         fig = plt.figure(figsize=(10, 5))
-        fig.patch.set_facecolor(COLORS["bg"])
+        fig.patch.set_facecolor('none')
+        fig.patch.set_alpha(0.0)
         if hasattr(shap_values, "base_values"):
             shap.plots.waterfall(shap_values[patient_idx], show=False)
         else:
@@ -300,7 +312,7 @@ class CKDVisualizer:
                              {"range": [70, 100], "color": "rgba(255,107,107,0.2)"}],
                    "threshold": {"line": {"color": "white", "width": 3}, "thickness": 0.8,
                                  "value": prob * 100}}))
-        fig.update_layout(paper_bgcolor=COLORS["bg"], font={"color": COLORS["text"]}, height=300)
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={"family": "Outfit, sans-serif", "color": COLORS["text"]}, height=300)
         return fig
 
     @staticmethod
@@ -530,9 +542,9 @@ class CKDVisualizer:
 
         fig.update_layout(
             polar=dict(
-                bgcolor=COLORS["bg"],
-                radialaxis=dict(visible=True, range=[0.4, 1.0], gridcolor=COLORS["grid"]),
-                angularaxis=dict(gridcolor=COLORS["grid"])
+                bgcolor='rgba(0,0,0,0)',
+                radialaxis=dict(visible=True, range=[0.4, 1.0], gridcolor="rgba(255,255,255,0.1)"),
+                angularaxis=dict(gridcolor="rgba(255,255,255,0.1)")
             ),
             title=f"Model Performance Radar (Top {top_n})",
             showlegend=True
