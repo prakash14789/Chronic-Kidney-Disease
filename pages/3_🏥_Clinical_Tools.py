@@ -2,7 +2,7 @@ import streamlit as st
 import app_tabs
 from core_state import (
     inject_custom_css, check_login, setup_sidebar, run_full_pipeline,
-    get_cached_shap, viz, trainer, reporter, df_full, sample_size
+    get_cached_shap, viz, trainer, reporter
 )
 
 st.set_page_config(page_title="Clinical Tools", page_icon="🏥", layout="wide")
