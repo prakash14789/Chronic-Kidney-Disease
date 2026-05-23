@@ -80,15 +80,47 @@ class PatientInput(BaseModel):
     HeavyMetalsExposure: Optional[int] = Field(0, description="1=Yes, 0=No", ge=0, le=1)
     Adherence: Optional[int] = Field(0, description="0=Adherent, 1=Non-Adherent", ge=0, le=1)
 
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "Age": 65,
+                    "Gender": 1,
+                    "BMI": 28.5,
+                    "Smoking": 1,
+                    "PhysicalActivity": 90,
+                    "DietQuality": 4,
+                    "SleepQuality": 5,
+                    "SystolicBP": 145,
+                    "DiastolicBP": 90,
+                    "FastingBloodSugar": 120,
+                    "HbA1c": 6.8,
+                    "HemoglobinLevels": 12.5,
+                    "CholesterolTotal": 220,
+                    "SerumElectrolytesSodium": 138,
+                    "SerumElectrolytesPotassium": 4.8,
+                    "FamilyHistoryKidneyDisease": 1,
+                    "FamilyHistoryHypertension": 1,
+                    "FamilyHistoryDiabetes": 1,
+                    "Edema": 1,
+                    "FatigueLevels": 7,
+                    "QualityOfLifeScore": 55,
+                    "HeavyMetalsExposure": 0,
+                    "Adherence": 1
+                }
+            ]
+        }
+    }
+
 
 class PredictionResponse(BaseModel):
-    risk_score: float
-    risk_percentage: str
-    risk_level: str
-    risk_color: str
-    clinical_action: str
-    model_used: str
-    threshold: float
+    risk_score: float = Field(..., description="Raw probability score (0.0 to 1.0) of CKD presence.")
+    risk_percentage: str = Field(..., description="Human-readable percentage string (e.g., '72.5%').")
+    risk_level: str = Field(..., description="Stratified risk level: 'Low Risk', 'Moderate Risk', or 'High Risk'.")
+    risk_color: str = Field(..., description="Hex color code associated with the risk level for UI rendering.")
+    clinical_action: str = Field(..., description="Recommended next steps for the clinician.")
+    model_used: str = Field(..., description="Name of the underlying ML model making the prediction.")
+    threshold: float = Field(..., description="The probability threshold used for binary classification.")
 
 
 class HealthResponse(BaseModel):
@@ -200,7 +232,28 @@ def health_check() -> HealthResponse:
     )
 
 
-@app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
+@app.post("/predict", response_model=PredictionResponse, tags=["Prediction"],
+          summary="Predict CKD risk for a single patient",
+          description="Analyzes clinical and lifestyle factors to generate a personalized Chronic Kidney Disease risk assessment. Returns a comprehensive evaluation including probability score, risk stratification, and recommended clinical actions.",
+          responses={
+              200: {
+                  "description": "Successfully calculated risk score.",
+                  "content": {
+                      "application/json": {
+                          "example": {
+                              "risk_score": 0.825,
+                              "risk_percentage": "82.5%",
+                              "risk_level": "High Risk",
+                              "risk_color": "#FF6B6B",
+                              "clinical_action": "Immediate medical attention required. Urgent nephrologist referral.",
+                              "model_used": "XGBoost",
+                              "threshold": 0.45
+                          }
+                      }
+                  }
+              },
+              503: {"description": "Model not loaded. Ensure the backend ML system is initialized."}
+          })
 def predict(patient: PatientInput, current_user: User = Depends(get_current_user)) -> PredictionResponse:
     """Predict CKD risk for a single patient."""
     if MODEL is None:
@@ -280,7 +333,9 @@ def predict_batch(patients: List[PatientInput], current_user: User = Depends(get
     return {"predictions": results, "count": len(results)}
 
 
-@app.post("/predict/fhir", tags=["Prediction", "EMR"])
+@app.post("/predict/fhir", tags=["Prediction", "EMR"],
+          summary="Generate FHIR-compliant RiskAssessment",
+          description="Accepts standard patient input and returns an HL7 FHIR (Fast Healthcare Interoperability Resources) R4 Bundle containing the Patient resource and RiskAssessment resource. Ideal for direct integration with hospital Electronic Medical Records (EMR) systems like Epic or Cerner.")
 def predict_fhir(patient: PatientInput, current_user: User = Depends(get_current_user)) -> Dict[str, Any]:
     """Predict CKD risk and return a FHIR-compliant JSON bundle for EMR integration."""
     if MODEL is None:
