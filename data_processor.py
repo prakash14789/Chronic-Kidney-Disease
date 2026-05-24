@@ -20,7 +20,7 @@ class CKDDataProcessor:
         # 1. Stratified Sample
         idx, _ = train_test_split(
             df_full.index, train_size=sample_n,
-            stratify=df_full["Diagnosis"], random_state=self.random_state
+            stratify=df_full["Diagnosis"], random_state=_self.random_state
         )
         df = df_full.loc[idx].reset_index(drop=True)
         
@@ -42,7 +42,7 @@ class CKDDataProcessor:
 
         # Now split
         X_tr, X_te, y_tr, y_te = train_test_split(
-            X, y, test_size=0.2, random_state=self.random_state, stratify=y
+            X, y, test_size=0.2, random_state=_self.random_state, stratify=y
         )
 
         # Reset indices to avoid SHAP misalignment
