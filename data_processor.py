@@ -1,4 +1,5 @@
 import pandas as pd
+import streamlit as st
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from typing import Tuple
@@ -9,10 +10,12 @@ class CKDDataProcessor:
         self.random_state = random_state
         self.le_adherence = LabelEncoder()
         
-    def load_raw_data(self) -> pd.DataFrame:
-        return pd.read_csv(self.data_path)
+    @st.cache_data
+    def load_raw_data(_self) -> pd.DataFrame:
+        return pd.read_csv(_self.data_path)
     
-    def get_v3_refined_data(self, df_full: pd.DataFrame, sample_n: int = 5000) -> pd.DataFrame:
+    @st.cache_data
+    def get_v3_refined_data(_self, df_full: pd.DataFrame, sample_n: int = 5000) -> pd.DataFrame:
         """EXACT V3 Data Refining Logic."""
         # 1. Stratified Sample
         idx, _ = train_test_split(
@@ -27,7 +30,8 @@ class CKDDataProcessor:
         
         return df
 
-    def split_and_encode_v3(self, df: pd.DataFrame, target: str = "Diagnosis") -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+    @st.cache_data
+    def split_and_encode_v3(_self, df: pd.DataFrame, target: str = "Diagnosis") -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
         """V3 Encoding and Splitting — encode before split for consistency."""
         X = df.drop(columns=[target])
         y = df[target]

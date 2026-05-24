@@ -57,13 +57,8 @@ class CKDModelTrainer:
         """Returns the EXACT list of v3 pipelines."""
         base = [
             ("Logistic Regression", LogisticRegression(max_iter=1000, class_weight="balanced", random_state=self.random_state), True),
-            ("Decision Tree", DecisionTreeClassifier(max_depth=8, class_weight="balanced", random_state=self.random_state), False),
             ("Random Forest", RandomForestClassifier(n_estimators=100, class_weight="balanced", random_state=self.random_state, n_jobs=-1), False),
             ("Gradient Boosting", GradientBoostingClassifier(n_estimators=100, subsample=0.8, random_state=self.random_state), False),
-            ("SVM", SVC(probability=True, kernel="rbf", class_weight="balanced", random_state=self.random_state, max_iter=2000), True),
-            ("KNN", KNeighborsClassifier(n_neighbors=7, n_jobs=-1), True),
-            ("Naive Bayes", GaussianNB(), False),
-            ("Extra Trees", ExtraTreesClassifier(n_estimators=100, max_depth=8, class_weight="balanced", random_state=self.random_state, n_jobs=-1), False),
         ]
         
         if XGBClassifier:
