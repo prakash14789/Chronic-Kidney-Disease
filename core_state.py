@@ -161,6 +161,26 @@ def inject_custom_css():
             -webkit-text-fill-color: transparent;
             font-weight: 800;
         }}
+        
+        /* Responsive Mobile Design */
+        @media (max-width: 768px) {{
+            .kpi-box {{
+                min-width: 100%;
+                margin-bottom: 15px;
+            }}
+            .kpi-row {{
+                gap: 10px;
+            }}
+            .metric-card, .glass-card, .kpi-box {{
+                padding: 20px 15px;
+            }}
+            .stMarkdown h1 {{
+                font-size: 2rem !important;
+            }}
+            .kpi-box h2 {{
+                font-size: 2.2rem;
+            }}
+        }}
         </style>
     """, unsafe_allow_html=True)
 
