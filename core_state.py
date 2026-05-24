@@ -20,115 +20,146 @@ def inject_custom_css():
         COLORS["grid"] = "#E2E8F0"
         COLORS["primary"] = "#2563EB"
         COLORS["secondary"] = "#1D4ED8"
-        COLORS["accent"] = "#1E40AF"
+        COLORS["accent"] = "#38BDF8"
         
-        bg_color = COLORS["bg"]
+        bg_gradient = "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)"
+        card_bg = "rgba(255, 255, 255, 0.7)"
+        border_color = "rgba(255, 255, 255, 0.4)"
+        shadow = "0 8px 32px 0 rgba(31, 38, 135, 0.07)"
         text_color = COLORS["text"]
-        card_bg = "rgba(255, 255, 255, 0.9)"
-        border_color = "rgba(0, 0, 0, 0.1)"
         accent_color = COLORS["primary"]
     else:
-        bg_color = COLORS["bg"]
+        COLORS["bg"] = "#0B1120"
+        COLORS["text"] = "#F8FAFC"
+        COLORS["primary"] = "#8B5CF6" # Vibrant Purple
+        COLORS["secondary"] = "#3B82F6" # Electric Blue
+        COLORS["accent"] = "#10B981" # Emerald Green
+        
+        bg_gradient = "radial-gradient(circle at top left, #1e1b4b, #0B1120 70%)"
+        card_bg = "rgba(17, 24, 39, 0.65)"
+        border_color = "rgba(255, 255, 255, 0.1)"
+        shadow = "0 8px 32px 0 rgba(0, 0, 0, 0.3)"
         text_color = COLORS["text"]
-        card_bg = "rgba(30, 41, 59, 0.7)"
-        border_color = "rgba(255, 255, 255, 0.08)"
         accent_color = COLORS["primary"]
 
     st.markdown(f"""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
         html, body, [class*="css"], .stApp {{
             font-family: 'Outfit', sans-serif !important;
         }}
 
         .stApp {{ 
-            background: radial-gradient(circle at top left, #1e293b, {bg_color}); 
+            background: {bg_gradient}; 
             color: {text_color}; 
         }}
         
-        .metric-card {{ 
+        @keyframes fadeIn {{
+            from {{ opacity: 0; transform: translateY(20px); }}
+            to {{ opacity: 1; transform: translateY(0); }}
+        }}
+        
+        @keyframes pulseGlow {{
+            0% {{ box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }}
+            70% {{ box-shadow: 0 0 15px 10px rgba(139, 92, 246, 0); }}
+            100% {{ box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }}
+        }}
+
+        /* Enhanced Glass Cards */
+        .metric-card, .glass-card, .kpi-box {{ 
             background: {card_bg}; 
-            backdrop-filter: blur(16px) saturate(180%);
-            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            backdrop-filter: blur(20px) saturate(200%);
+            -webkit-backdrop-filter: blur(20px) saturate(200%);
             color: {text_color} !important; 
-            padding: 24px; 
-            border-radius: 16px; 
-            border-left: 5px solid {accent_color}; 
-            margin-bottom: 20px;
-            border-top: 1px solid {border_color};
-            border-right: 1px solid {border_color};
-            border-bottom: 1px solid {border_color};
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-radius: 20px; 
+            border: 1px solid {border_color};
+            box-shadow: {shadow};
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: fadeIn 0.8s ease-out forwards;
+            position: relative;
+            overflow: hidden;
         }}
         
-        .metric-card:hover {{
-            transform: translateY(-5px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
-            border-color: rgba(67, 97, 238, 0.3);
+        /* Premium glowing border on hover */
+        .metric-card:hover, .glass-card:hover, .kpi-box:hover {{
+            transform: translateY(-8px) scale(1.02);
+            border-color: {accent_color};
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3), 0 0 20px rgba(139, 92, 246, 0.2);
         }}
 
+        .metric-card {{ padding: 28px; margin-bottom: 24px; border-left: 6px solid {accent_color}; }}
+        .glass-card {{ padding: 28px; margin-bottom: 20px; }}
+        
         .metric-card h4, .metric-card p {{ color: {text_color} !important; margin: 0; }}
-        
-        .glass-card {{
-            background: {card_bg}; 
-            backdrop-filter: blur(16px) saturate(180%);
-            -webkit-backdrop-filter: blur(16px) saturate(180%);
-            border: 1px solid {border_color}; 
-            border-radius: 16px;
-            padding: 24px; 
-            margin-bottom: 16px;
-            color: {text_color};
-            transition: all 0.3s ease;
-        }}
-        
-        .glass-card:hover {{
-            border-color: rgba(67, 97, 238, 0.3);
-            box-shadow: 0 8px 12px -1px rgba(0, 0, 0, 0.1);
-        }}
 
-        .kpi-row {{ display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }}
+        .kpi-row {{ display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }}
         
         .kpi-box {{
             flex: 1; 
-            min-width: 200px;
-            background: {card_bg};
-            backdrop-filter: blur(16px) saturate(180%);
-            -webkit-backdrop-filter: blur(16px) saturate(180%);
-            border-radius: 16px; 
-            padding: 24px; 
+            min-width: 220px;
+            padding: 30px 20px; 
             text-align: center;
-            border: 1px solid {border_color};
-            color: {text_color};
-            transition: all 0.3s ease;
-        }}
-        
-        .kpi-box:hover {{
-            transform: translateY(-3px);
-            border-color: rgba(67, 97, 238, 0.3);
         }}
 
-        .kpi-box h2 {{ color: {accent_color}; margin: 0; font-size: 2.2rem; font-weight: 700; }}
-        .kpi-box p {{ color: {text_color}; margin: 6px 0 0 0; font-size: 0.9rem; opacity: 0.8; }}
+        .kpi-box h2 {{ 
+            background: linear-gradient(135deg, {COLORS["primary"]}, {COLORS["secondary"]});
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 10px 0 0 0; 
+            font-size: 2.8rem; 
+            font-weight: 800; 
+            letter-spacing: -1px;
+        }}
         
+        .kpi-box p {{ 
+            color: {text_color}; 
+            margin: 0; 
+            font-size: 1rem; 
+            font-weight: 500;
+            opacity: 0.8; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }}
+        
+        /* Ultra-premium glowing buttons */
         .stButton>button {{
-            background: linear-gradient(135deg, {accent_color} 0%, #1D4ED8 100%) !important;
+            background: linear-gradient(135deg, {COLORS["primary"]}, {COLORS["secondary"]}) !important;
             color: white !important;
             border: none !important;
-            border-radius: 10px !important;
-            font-weight: 600 !important;
-            transition: all 0.3s ease !important;
+            border-radius: 12px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.5px !important;
+            padding: 10px 24px !important;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3) !important;
         }}
         
         .stButton>button:hover {{
-            transform: translateY(-2px) !important;
-            box-shadow: 0 4px 12px rgba(67, 97, 238, 0.3) !important;
+            transform: translateY(-3px) scale(1.05) !important;
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.5) !important;
+            animation: pulseGlow 1.5s infinite;
         }}
         
+        /* Sidebar styling */
         [data-testid="stSidebar"] {{
-            background-color: #0f172a !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+            background: rgba(11, 17, 32, 0.8) !important;
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+        }}
+        
+        /* Gradient Headers */
+        h1, h2, h3 {{
+            letter-spacing: -0.05em;
+        }}
+        
+        .stMarkdown h1 {{
+            background: linear-gradient(to right, {COLORS["primary"]}, {COLORS["accent"]});
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
         }}
         </style>
     """, unsafe_allow_html=True)
