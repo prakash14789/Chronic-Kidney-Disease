@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from data_processor import CKDDataProcessor
 from model_trainer import CKDModelTrainer
 from visualizer import CKDVisualizer, COLORS
@@ -10,6 +11,42 @@ processor = CKDDataProcessor()
 trainer = CKDModelTrainer()
 viz = CKDVisualizer()
 reporter = CKDReportGenerator()
+
+def render_guided_tour():
+    components.html("""
+    <script>
+    if (!window.parent.document.getElementById('driver-js-script')) {
+        var link = window.parent.document.createElement('link');
+        link.id = 'driver-js-css';
+        link.rel = 'stylesheet';
+        link.href = 'https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css';
+        window.parent.document.head.appendChild(link);
+        
+        var script = window.parent.document.createElement('script');
+        script.id = 'driver-js-script';
+        script.src = 'https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js';
+        script.onload = function() {
+            startTour();
+        };
+        window.parent.document.head.appendChild(script);
+    } else {
+        startTour();
+    }
+    
+    function startTour() {
+        const driver = window.parent.driver.js.driver;
+        const driverObj = driver({
+          showProgress: true,
+          steps: [
+            { element: '[data-testid="stSidebar"]', popover: { title: 'Navigation Sidebar', description: 'Configure dataset size, toggle cross-validation, and access other global tools.', side: "right", align: 'start' } },
+            { element: 'div.kpi-row', popover: { title: 'Key Metrics', description: 'These cards show the best model performance and ROC-AUC at a glance.', side: "bottom", align: 'start' } },
+            { element: '[data-testid="stHeader"]', popover: { title: 'Application Header', description: 'This section gives you top-level navigation and state.', side: "bottom", align: 'start' } }
+          ]
+        });
+        driverObj.drive();
+    }
+    </script>
+    """, height=0, width=0)
 
 def inject_custom_css():
     theme = st.sidebar.selectbox("🎨 Theme", ["Premium Dark (Glass)", "Clinical Light"], index=0, key="global_theme")
@@ -230,6 +267,8 @@ def setup_sidebar():
         st.markdown("[🔗 View Source on GitHub](https://github.com/prakash14789/Chronic-Kidney-Disease)")
         st.success("v3.3 Research Pipeline Active")
         st.divider()
+        if st.button("🧭 Take a Tour", use_container_width=True):
+            render_guided_tour()
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state['logged_in'] = False
             st.session_state['role'] = None
