@@ -9,7 +9,7 @@ st.set_page_config(page_title="Clinical Tools", page_icon="🏥", layout="wide")
 
 inject_custom_css()
 check_login()
-sample_size, use_cv = setup_sidebar()
+sample_size, use_cv = setup_sidebar("Clinical Tools")
 
 # Fetch cached data
 (df_full, df_sample, res_f, roc_f, res_nl, roc_nl, pr_nl,

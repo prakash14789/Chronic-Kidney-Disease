@@ -12,10 +12,35 @@ trainer = CKDModelTrainer()
 viz = CKDVisualizer()
 reporter = CKDReportGenerator()
 
-def render_guided_tour():
-    components.html("""
+def render_guided_tour(page_name="Home"):
+    if page_name == "Home":
+        steps_js = """[
+            { element: '[data-testid="stSidebar"]', popover: { title: 'Navigation Sidebar', description: 'Configure dataset size, toggle cross-validation, and navigate to different pages.', side: "right", align: 'start' } },
+            { element: 'div.kpi-row', popover: { title: 'Key Metrics', description: 'These cards show the best model performance and ROC-AUC at a glance.', side: "bottom", align: 'start' } },
+            { element: '[data-testid="stHeader"]', popover: { title: 'Application Header', description: 'This section gives you top-level navigation and state.', side: "bottom", align: 'start' } },
+            { element: '[data-testid="stMarkdownContainer"] h2', popover: { title: 'Data Audit', description: 'Here we analyze class imbalance and data distributions before modeling.', side: "top", align: 'start' } }
+        ]"""
+    elif page_name == "Model Analytics":
+        steps_js = """[
+            { element: '[data-testid="stSidebar"]', popover: { title: 'Navigation Sidebar', description: 'Access other tools from here.', side: "right", align: 'start' } },
+            { element: 'div[data-testid="stTabs"]', popover: { title: 'Experiments & Analytics', description: 'Switch between full feature experiments, no-leakage models, SMOTE insights, and Optuna tuning.', side: "bottom", align: 'start' } }
+        ]"""
+    elif page_name == "Interpretability":
+        steps_js = """[
+            { element: '[data-testid="stSidebar"]', popover: { title: 'Navigation Sidebar', description: 'Global settings apply to all interpretability tools.', side: "right", align: 'start' } },
+            { element: 'div[data-testid="stTabs"]', popover: { title: 'Interpretability Tools', description: 'Tune clinical decision thresholds, view global SHAP explanations, and analyze error patterns.', side: "bottom", align: 'start' } }
+        ]"""
+    elif page_name == "Clinical Tools":
+        steps_js = """[
+            { element: '[data-testid="stSidebar"]', popover: { title: 'Navigation Sidebar', description: 'Return to other dashboard sections.', side: "right", align: 'start' } },
+            { element: 'div[data-testid="stTabs"]', popover: { title: 'Clinical Interfaces', description: 'Use tools like Precision Patient Diagnosis, Batch Prediction, and Risk Timelines.', side: "bottom", align: 'start' } }
+        ]"""
+    else:
+        steps_js = "[]"
+
+    components.html(f"""
     <script>
-    if (!window.parent.document.getElementById('driver-js-script')) {
+    if (!window.parent.document.getElementById('driver-js-script')) {{
         var link = window.parent.document.createElement('link');
         link.id = 'driver-js-css';
         link.rel = 'stylesheet';
@@ -25,26 +50,22 @@ def render_guided_tour():
         var script = window.parent.document.createElement('script');
         script.id = 'driver-js-script';
         script.src = 'https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js';
-        script.onload = function() {
+        script.onload = function() {{
             startTour();
-        };
+        }};
         window.parent.document.head.appendChild(script);
-    } else {
+    }} else {{
         startTour();
-    }
+    }}
     
-    function startTour() {
+    function startTour() {{
         const driver = window.parent.driver.js.driver;
-        const driverObj = driver({
+        const driverObj = driver({{
           showProgress: true,
-          steps: [
-            { element: '[data-testid="stSidebar"]', popover: { title: 'Navigation Sidebar', description: 'Configure dataset size, toggle cross-validation, and access other global tools.', side: "right", align: 'start' } },
-            { element: 'div.kpi-row', popover: { title: 'Key Metrics', description: 'These cards show the best model performance and ROC-AUC at a glance.', side: "bottom", align: 'start' } },
-            { element: '[data-testid="stHeader"]', popover: { title: 'Application Header', description: 'This section gives you top-level navigation and state.', side: "bottom", align: 'start' } }
-          ]
-        });
+          steps: {steps_js}
+        }});
         driverObj.drive();
-    }
+    }}
     </script>
     """, height=0, width=0)
 
@@ -257,7 +278,7 @@ def check_login():
                         st.error("Invalid username or password")
         st.stop()
 
-def setup_sidebar():
+def setup_sidebar(page_name="Home"):
     with st.sidebar:
         st.title("🧬 CKD Intelligence")
         st.image("https://cdn-icons-png.flaticon.com/512/3067/3067451.png", width=80)
@@ -268,7 +289,7 @@ def setup_sidebar():
         st.success("v3.3 Research Pipeline Active")
         st.divider()
         if st.button("🧭 Take a Tour", use_container_width=True):
-            render_guided_tour()
+            render_guided_tour(page_name)
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state['logged_in'] = False
             st.session_state['role'] = None
