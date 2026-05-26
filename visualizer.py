@@ -34,15 +34,19 @@ class CKDVisualizer:
             paper_bgcolor='rgba(0,0,0,0)',
             font=dict(family='Outfit, sans-serif', color=COLORS["text"]),
             xaxis=dict(showgrid=False, zeroline=False, showline=False),
-            yaxis=dict(showgrid=False, zeroline=False, showline=False),
+            yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, showline=False),
             margin=dict(l=40, r=40, t=60, b=40),
+            hovermode="x unified",
             hoverlabel=dict(
-                bgcolor="rgba(30, 41, 59, 0.85)",
-                font_size=13,
+                bgcolor="rgba(15, 20, 35, 0.95)",
+                font_size=14,
                 font_family="Outfit, sans-serif",
-                bordercolor="rgba(67, 97, 238, 0.5)"
-            )
+                bordercolor="rgba(139, 92, 246, 0.5)",
+            ),
+            transition_duration=500
         )
+        # Apply rounded corners to all bar charts for a premium look
+        fig.update_traces(marker_cornerradius=12, selector=dict(type='bar'))
         return fig
 
     @staticmethod

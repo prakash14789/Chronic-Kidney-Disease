@@ -100,11 +100,31 @@ def render_threshold_tuning(y_te_f: pd.Series, y_proba_all: np.ndarray, best_th:
     user_th = st.slider("Adjust Threshold", 0.05, 0.95, float(best_th), 0.05, key="th_slider")
     
     y_at_th = (y_proba_all >= user_th).astype(int)
-    tc1, tc2, tc3, tc4 = st.columns(4)
-    with tc1: st.metric("Balanced Acc", f"{balanced_accuracy_score(y_te_f, y_at_th):.2%}")
-    with tc2: st.metric("Precision", f"{precision_score(y_te_f, y_at_th, zero_division=0):.2%}")
-    with tc3: st.metric("Recall", f"{recall_score(y_te_f, y_at_th, zero_division=0):.2%}")
-    with tc4: st.metric("Macro F1", f"{f1_score(y_te_f, y_at_th, average='macro', zero_division=0):.2%}")
+    b_acc = balanced_accuracy_score(y_te_f, y_at_th)
+    prec = precision_score(y_te_f, y_at_th, zero_division=0)
+    rec = recall_score(y_te_f, y_at_th, zero_division=0)
+    f1 = f1_score(y_te_f, y_at_th, average='macro', zero_division=0)
+
+    st.markdown(f"""
+    <div class='kpi-row'>
+        <div class='kpi-box'>
+            <p>Balanced Acc</p>
+            <div class="animate-number" data-target="{b_acc * 100}" data-percent="true">0%</div>
+        </div>
+        <div class='kpi-box'>
+            <p>Precision</p>
+            <div class="animate-number" data-target="{prec * 100}" data-percent="true">0%</div>
+        </div>
+        <div class='kpi-box'>
+            <p>Recall</p>
+            <div class="animate-number" data-target="{rec * 100}" data-percent="true">0%</div>
+        </div>
+        <div class='kpi-box'>
+            <p>Macro F1</p>
+            <div class="animate-number" data-target="{f1 * 100}" data-percent="true">0%</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     if st.button("Run Sanity Check"):
         acc = trainer.run_sanity_check(trained_nl[best_name], X_te_nl, y_te_f)
         st.metric("Shuffled Balanced Accuracy", f"{acc:.2%}")

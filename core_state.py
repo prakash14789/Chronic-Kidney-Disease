@@ -1,4 +1,13 @@
 import streamlit as st
+import functools
+
+# Monkey-patch plotly_chart to force theme=None so our custom premium theme applies
+_original_plotly_chart = st.plotly_chart
+@functools.wraps(_original_plotly_chart)
+def _premium_plotly_chart(figure_or_data, use_container_width=False, theme=None, **kwargs):
+    return _original_plotly_chart(figure_or_data, use_container_width=use_container_width, theme=None, **kwargs)
+st.plotly_chart = _premium_plotly_chart
+
 import streamlit.components.v1 as components
 from data_processor import CKDDataProcessor
 from model_trainer import CKDModelTrainer
@@ -93,16 +102,17 @@ def inject_custom_css():
         COLORS["secondary"] = "#3B82F6" # Electric Blue
         COLORS["accent"] = "#10B981" # Emerald Green
         
-        bg_gradient = "radial-gradient(circle at top left, #1e1b4b, #0B1120 70%)"
-        card_bg = "rgba(17, 24, 39, 0.65)"
-        border_color = "rgba(255, 255, 255, 0.1)"
-        shadow = "0 8px 32px 0 rgba(0, 0, 0, 0.3)"
+        # Premium animated gradient background
+        bg_gradient = "linear-gradient(-45deg, #0B1120, #1e1b4b, #0f172a, #171033)"
+        card_bg = "rgba(15, 20, 35, 0.55)"
+        border_color = "rgba(255, 255, 255, 0.15)"
+        shadow = "0 8px 32px 0 rgba(0, 0, 0, 0.4)"
         text_color = COLORS["text"]
         accent_color = COLORS["primary"]
 
     st.markdown(f"""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
 
         html, body, [class*="css"], .stApp {{
             font-family: 'Outfit', sans-serif !important;
@@ -110,7 +120,15 @@ def inject_custom_css():
 
         .stApp {{ 
             background: {bg_gradient}; 
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
             color: {text_color}; 
+        }}
+        
+        @keyframes gradientBG {{
+            0% {{ background-position: 0% 50%; }}
+            50% {{ background-position: 100% 50%; }}
+            100% {{ background-position: 0% 50%; }}
         }}
         
         @keyframes fadeIn {{
@@ -119,31 +137,32 @@ def inject_custom_css():
         }}
         
         @keyframes pulseGlow {{
-            0% {{ box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }}
-            70% {{ box-shadow: 0 0 15px 10px rgba(139, 92, 246, 0); }}
+            0% {{ box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.6); }}
+            70% {{ box-shadow: 0 0 20px 15px rgba(139, 92, 246, 0); }}
             100% {{ box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }}
         }}
 
-        /* Enhanced Glass Cards */
-        .metric-card, .glass-card, .kpi-box {{ 
+        /* Enhanced Glass Cards with Tilt Support */
+        .metric-card, .glass-card, .kpi-box, .tilt-card {{ 
             background: {card_bg}; 
-            backdrop-filter: blur(20px) saturate(200%);
-            -webkit-backdrop-filter: blur(20px) saturate(200%);
+            backdrop-filter: blur(25px) saturate(250%);
+            -webkit-backdrop-filter: blur(25px) saturate(250%);
             color: {text_color} !important; 
-            border-radius: 20px; 
+            border-radius: 24px; 
             border: 1px solid {border_color};
             box-shadow: {shadow};
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: border-color 0.4s, box-shadow 0.4s;
             animation: fadeIn 0.8s ease-out forwards;
             position: relative;
             overflow: hidden;
+            /* Inner glow for glassmorphism */
+            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.05), {shadow};
         }}
         
         /* Premium glowing border on hover */
-        .metric-card:hover, .glass-card:hover, .kpi-box:hover {{
-            transform: translateY(-8px) scale(1.02);
-            border-color: {accent_color};
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3), 0 0 20px rgba(139, 92, 246, 0.2);
+        .metric-card:hover, .glass-card:hover, .kpi-box:hover, .tilt-card:hover {{
+            border-color: rgba(255, 255, 255, 0.4);
+            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.1), 0 15px 35px rgba(0, 0, 0, 0.4), 0 0 25px rgba(139, 92, 246, 0.3);
         }}
 
         .metric-card {{ padding: 28px; margin-bottom: 24px; border-left: 6px solid {accent_color}; }}
@@ -151,33 +170,38 @@ def inject_custom_css():
         
         .metric-card h4, .metric-card p {{ color: {text_color} !important; margin: 0; }}
 
-        .kpi-row {{ display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }}
+        .kpi-row {{ display: flex; gap: 24px; margin-bottom: 30px; flex-wrap: wrap; }}
         
         .kpi-box {{
             flex: 1; 
             min-width: 220px;
-            padding: 30px 20px; 
+            padding: 35px 25px; 
             text-align: center;
+            /* Ensure vanilla-tilt 3d elements pop out */
+            transform-style: preserve-3d; 
         }}
 
-        .kpi-box h2 {{ 
-            background: linear-gradient(135deg, {COLORS["primary"]}, {COLORS["secondary"]});
+        .kpi-box h2, .animate-number {{ 
+            background: linear-gradient(135deg, {COLORS["primary"]}, {COLORS["accent"]});
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin: 10px 0 0 0; 
-            font-size: 2.8rem; 
-            font-weight: 800; 
-            letter-spacing: -1px;
+            margin: 15px 0 0 0; 
+            font-size: 3.2rem; 
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700; 
+            letter-spacing: -2px;
+            transform: translateZ(30px); /* 3D pop effect */
         }}
         
         .kpi-box p {{ 
             color: {text_color}; 
             margin: 0; 
-            font-size: 1rem; 
-            font-weight: 500;
+            font-size: 1.1rem; 
+            font-weight: 600;
             opacity: 0.8; 
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
+            transform: translateZ(20px); /* 3D pop effect */
         }}
         
         /* Ultra-premium glowing buttons */
@@ -185,27 +209,28 @@ def inject_custom_css():
             background: linear-gradient(135deg, {COLORS["primary"]}, {COLORS["secondary"]}) !important;
             color: white !important;
             border: none !important;
-            border-radius: 12px !important;
+            border-radius: 14px !important;
             font-weight: 700 !important;
-            letter-spacing: 0.5px !important;
-            padding: 10px 24px !important;
+            letter-spacing: 1px !important;
+            padding: 12px 28px !important;
             transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
             position: relative;
             overflow: hidden;
             box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3) !important;
+            font-family: 'Space Grotesk', sans-serif !important;
         }}
         
         .stButton>button:hover {{
-            transform: translateY(-3px) scale(1.05) !important;
-            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.5) !important;
+            transform: translateY(-4px) scale(1.05) !important;
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.6) !important;
             animation: pulseGlow 1.5s infinite;
         }}
         
         /* Sidebar styling */
         [data-testid="stSidebar"] {{
-            background: rgba(11, 17, 32, 0.8) !important;
-            backdrop-filter: blur(20px);
-            border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+            background: rgba(11, 17, 32, 0.4) !important;
+            backdrop-filter: blur(40px);
+            border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
         }}
         
         /* Gradient Headers */
@@ -218,29 +243,131 @@ def inject_custom_css():
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             font-weight: 800;
-        }}
-        
-        /* Responsive Mobile Design */
-        @media (max-width: 768px) {{
-            .kpi-box {{
-                min-width: 100%;
-                margin-bottom: 15px;
-            }}
-            .kpi-row {{
-                gap: 10px;
-            }}
-            .metric-card, .glass-card, .kpi-box {{
-                padding: 20px 15px;
-            }}
-            .stMarkdown h1 {{
-                font-size: 2rem !important;
-            }}
-            .kpi-box h2 {{
-                font-size: 2.2rem;
-            }}
+            text-align: center;
         }}
         </style>
     """, unsafe_allow_html=True)
+    
+    inject_premium_js()
+
+def inject_premium_js():
+    components.html("""
+    <script>
+    const parentDoc = window.parent.document;
+    
+    // 1. Particle Background
+    if (!parentDoc.getElementById('particles-js-script')) {
+        const script = parentDoc.createElement('script');
+        script.id = 'particles-js-script';
+        script.src = 'https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js';
+        script.onload = function() {
+            if (!parentDoc.getElementById('particles-bg')) {
+                const particleDiv = parentDoc.createElement('div');
+                particleDiv.id = 'particles-bg';
+                particleDiv.style.position = 'fixed';
+                particleDiv.style.top = '0';
+                particleDiv.style.left = '0';
+                particleDiv.style.width = '100vw';
+                particleDiv.style.height = '100vh';
+                particleDiv.style.zIndex = '-1';
+                particleDiv.style.pointerEvents = 'none'; // so it doesn't block clicks
+                parentDoc.querySelector('.stApp').prepend(particleDiv);
+                
+                window.parent.particlesJS('particles-bg', {
+                  "particles": {
+                    "number": { "value": 60, "density": { "enable": true, "value_area": 800 } },
+                    "color": { "value": "#8b5cf6" },
+                    "shape": { "type": "circle" },
+                    "opacity": { "value": 0.4, "random": true },
+                    "size": { "value": 3, "random": true },
+                    "line_linked": { "enable": true, "distance": 150, "color": "#3b82f6", "opacity": 0.2, "width": 1 },
+                    "move": { "enable": true, "speed": 1.5, "direction": "none", "random": true, "straight": false, "out_mode": "out", "bounce": false }
+                  },
+                  "interactivity": {
+                    "detect_on": "window",
+                    "events": {
+                      "onhover": { "enable": true, "mode": "grab" },
+                      "onclick": { "enable": true, "mode": "push" },
+                      "resize": true
+                    },
+                    "modes": { "grab": { "distance": 180, "line_linked": { "opacity": 0.6 } }, "push": { "particles_nb": 4 } }
+                  },
+                  "retina_detect": true
+                });
+            }
+        };
+        parentDoc.head.appendChild(script);
+    }
+
+    // 2. Vanilla Tilt & Animated Numbers (via MutationObserver)
+    if (!parentDoc.getElementById('vanilla-tilt-script')) {
+        const tiltScript = parentDoc.createElement('script');
+        tiltScript.id = 'vanilla-tilt-script';
+        tiltScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.1/vanilla-tilt.min.js';
+        parentDoc.head.appendChild(tiltScript);
+        
+        const observer = new MutationObserver((mutations) => {
+            if (window.parent.VanillaTilt) {
+                const cards = parentDoc.querySelectorAll('.tilt-card:not(.tilt-applied), .kpi-box:not(.tilt-applied), .metric-card:not(.tilt-applied), .glass-card:not(.tilt-applied)');
+                if (cards.length > 0) {
+                    window.parent.VanillaTilt.init(cards, {
+                        max: 12,
+                        speed: 400,
+                        glare: true,
+                        "max-glare": 0.2,
+                        scale: 1.03
+                    });
+                    cards.forEach(c => c.classList.add('tilt-applied'));
+                }
+                
+                // Number Animation
+                const numbers = parentDoc.querySelectorAll('.animate-number:not(.anim-applied)');
+                numbers.forEach(el => {
+                    el.classList.add('anim-applied');
+                    const target = parseFloat(el.getAttribute('data-target'));
+                    const isPercent = el.getAttribute('data-percent') === 'true';
+                    const isDecimal = el.getAttribute('data-decimal') === 'true';
+                    const duration = 2000; // 2 seconds
+                    const start = performance.now();
+                    
+                    const updateNumber = (currentTime) => {
+                        const elapsed = currentTime - start;
+                        const progress = Math.min(elapsed / duration, 1);
+                        const easeProgress = 1 - Math.pow(1 - progress, 4); // Quartic ease out
+                        const current = target * easeProgress;
+                        
+                        let display = current;
+                        if (isPercent) display = current.toFixed(2) + '%';
+                        else if (isDecimal) display = current.toFixed(4);
+                        else display = Math.floor(current).toLocaleString();
+                        
+                        el.innerText = display;
+                        
+                        if (progress < 1) {
+                            requestAnimationFrame(updateNumber);
+                        } else {
+                            let finalDisplay = target;
+                            if (isPercent) finalDisplay = target.toFixed(2) + '%';
+                            else if (isDecimal) finalDisplay = target.toFixed(4);
+                            else finalDisplay = target.toLocaleString();
+                            el.innerText = finalDisplay;
+                        }
+                    };
+                    requestAnimationFrame(updateNumber);
+                });
+            }
+        });
+        // Wait for body to be available, then observe
+        if(parentDoc.body) {
+            observer.observe(parentDoc.body, { childList: true, subtree: true });
+        } else {
+            parentDoc.addEventListener('DOMContentLoaded', () => {
+                observer.observe(parentDoc.body, { childList: true, subtree: true });
+            });
+        }
+    }
+    </script>
+    """, height=0, width=0)
 
 def check_login():
     if 'logged_in' not in st.session_state:

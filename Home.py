@@ -27,15 +27,15 @@ st.markdown(f"""
     </div>
     <div class='kpi-box'>
         <p>🎯 Balanced Accuracy</p>
-        <h2>{res_nl.iloc[0]['Balanced Accuracy']:.2%}</h2>
+        <div class="animate-number" data-target="{res_nl.iloc[0]['Balanced Accuracy'] * 100}" data-percent="true">0%</div>
     </div>
     <div class='kpi-box'>
         <p>📈 ROC-AUC</p>
-        <h2>{res_nl.iloc[0]['ROC-AUC']:.4f}</h2>
+        <div class="animate-number" data-target="{res_nl.iloc[0]['ROC-AUC']}" data-decimal="true">0.0000</div>
     </div>
     <div class='kpi-box'>
         <p>📊 Dataset Size</p>
-        <h2>{len(df_full):,}</h2>
+        <div class="animate-number" data-target="{len(df_full)}">0</div>
         <p style='font-size: 0.8rem; opacity: 0.6;'>Sampled to {sample_size}</p>
     </div>
 </div>
