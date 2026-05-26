@@ -1,6 +1,6 @@
 import streamlit as st
 import app_tabs
-from core_state import inject_custom_css, check_login, setup_sidebar, run_full_pipeline, viz, load_lottieurl
+from core_state import inject_custom_css, check_login, setup_sidebar, run_full_pipeline, viz, load_lottie_file
 from streamlit_lottie import st_lottie
 
 # Must be the very first Streamlit command
@@ -20,7 +20,7 @@ ckd_pct = df_full['Diagnosis'].mean() * 100
 
 hc1, hc2, hc3 = st.columns([1, 2, 1])
 with hc2:
-    lottie_dna = load_lottieurl("https://lottie.host/7900b8bf-dc7d-4581-91a6-733c0d7ff3eb/uU59NlWv7Z.json")
+    lottie_dna = load_lottie_file("assets/loading.json")
     if lottie_dna:
         st_lottie(lottie_dna, height=120, key="home_lottie")
     else:

@@ -22,6 +22,15 @@ def load_lottieurl(url: str):
     except:
         return None
 
+@st.cache_data
+def load_lottie_file(filepath: str):
+    import json
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return None
+
 from data_processor import CKDDataProcessor
 from model_trainer import CKDModelTrainer
 from visualizer import CKDVisualizer, COLORS
@@ -402,7 +411,7 @@ def check_login():
     if not st.session_state['logged_in']:
         col1, col2, col3 = st.columns([1, 1.5, 1])
         with col2:
-            lottie_medical = load_lottieurl("https://lottie.host/7900b8bf-dc7d-4581-91a6-733c0d7ff3eb/uU59NlWv7Z.json")
+            lottie_medical = load_lottie_file("assets/loading.json")
             if lottie_medical:
                 st_lottie(lottie_medical, height=150, key="login_lottie")
             else:
