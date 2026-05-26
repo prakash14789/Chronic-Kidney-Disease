@@ -320,11 +320,15 @@ def inject_premium_js():
         }
         
         // Number Animation
-        const numbers = parentDoc.querySelectorAll('.animate-number:not(.anim-applied)');
+        const numbers = parentDoc.querySelectorAll('.animate-number');
         numbers.forEach(el => {
-            el.classList.add('anim-applied');
-            const target = parseFloat(el.getAttribute('data-target'));
+            const targetStr = el.getAttribute('data-target');
+            if (!targetStr || el.getAttribute('data-anim-target') === targetStr) return;
+            
+            el.setAttribute('data-anim-target', targetStr);
+            const target = parseFloat(targetStr);
             if (isNaN(target)) return;
+            
             const isPercent = el.getAttribute('data-percent') === 'true';
             const isDecimal = el.getAttribute('data-decimal') === 'true';
             const duration = 2000;
@@ -359,18 +363,20 @@ def inject_premium_js():
     // Run immediately for already rendered elements
     applyPremiumEffects();
     
-    // Setup global MutationObserver
-    if (!window.parent.ckdObserver) {
-        window.parent.ckdObserver = new MutationObserver(() => {
-            applyPremiumEffects();
-        });
-        if (parentDoc.body) {
+    // Setup global MutationObserver correctly (cleanup old observer to avoid dead closures)
+    if (window.parent.ckdObserver) {
+        window.parent.ckdObserver.disconnect();
+    }
+    window.parent.ckdObserver = new MutationObserver(() => {
+        applyPremiumEffects();
+    });
+    
+    if (parentDoc.body) {
+        window.parent.ckdObserver.observe(parentDoc.body, { childList: true, subtree: true });
+    } else {
+        parentDoc.addEventListener('DOMContentLoaded', () => {
             window.parent.ckdObserver.observe(parentDoc.body, { childList: true, subtree: true });
-        } else {
-            parentDoc.addEventListener('DOMContentLoaded', () => {
-                window.parent.ckdObserver.observe(parentDoc.body, { childList: true, subtree: true });
-            });
-        }
+        });
     }
     </script>
     """, height=0, width=0)
