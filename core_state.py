@@ -307,6 +307,7 @@ def inject_premium_js():
         parentDoc.head.appendChild(tiltScript);
         
         const observer = new MutationObserver((mutations) => {
+            // Vanilla Tilt
             if (window.parent.VanillaTilt) {
                 const cards = parentDoc.querySelectorAll('.tilt-card:not(.tilt-applied), .kpi-box:not(.tilt-applied), .metric-card:not(.tilt-applied), .glass-card:not(.tilt-applied)');
                 if (cards.length > 0) {
@@ -319,43 +320,44 @@ def inject_premium_js():
                     });
                     cards.forEach(c => c.classList.add('tilt-applied'));
                 }
-                
-                // Number Animation
-                const numbers = parentDoc.querySelectorAll('.animate-number:not(.anim-applied)');
-                numbers.forEach(el => {
-                    el.classList.add('anim-applied');
-                    const target = parseFloat(el.getAttribute('data-target'));
-                    const isPercent = el.getAttribute('data-percent') === 'true';
-                    const isDecimal = el.getAttribute('data-decimal') === 'true';
-                    const duration = 2000; // 2 seconds
-                    const start = performance.now();
-                    
-                    const updateNumber = (currentTime) => {
-                        const elapsed = currentTime - start;
-                        const progress = Math.min(elapsed / duration, 1);
-                        const easeProgress = 1 - Math.pow(1 - progress, 4); // Quartic ease out
-                        const current = target * easeProgress;
-                        
-                        let display = current;
-                        if (isPercent) display = current.toFixed(2) + '%';
-                        else if (isDecimal) display = current.toFixed(4);
-                        else display = Math.floor(current).toLocaleString();
-                        
-                        el.innerText = display;
-                        
-                        if (progress < 1) {
-                            requestAnimationFrame(updateNumber);
-                        } else {
-                            let finalDisplay = target;
-                            if (isPercent) finalDisplay = target.toFixed(2) + '%';
-                            else if (isDecimal) finalDisplay = target.toFixed(4);
-                            else finalDisplay = target.toLocaleString();
-                            el.innerText = finalDisplay;
-                        }
-                    };
-                    requestAnimationFrame(updateNumber);
-                });
             }
+            
+            // Number Animation (Independent of VanillaTilt)
+            const numbers = parentDoc.querySelectorAll('.animate-number:not(.anim-applied)');
+            numbers.forEach(el => {
+                el.classList.add('anim-applied');
+                const target = parseFloat(el.getAttribute('data-target'));
+                const isPercent = el.getAttribute('data-percent') === 'true';
+                const isDecimal = el.getAttribute('data-decimal') === 'true';
+                const duration = 2000; // 2 seconds
+                
+                let start = null;
+                const updateNumber = (currentTime) => {
+                    if (!start) start = currentTime;
+                    const elapsed = currentTime - start;
+                    const progress = Math.min(elapsed / duration, 1);
+                    const easeProgress = 1 - Math.pow(1 - progress, 4); // Quartic ease out
+                    const current = target * easeProgress;
+                    
+                    let display = current;
+                    if (isPercent) display = current.toFixed(2) + '%';
+                    else if (isDecimal) display = current.toFixed(4);
+                    else display = Math.floor(current).toLocaleString();
+                    
+                    el.innerText = display;
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(updateNumber);
+                    } else {
+                        let finalDisplay = target;
+                        if (isPercent) finalDisplay = target.toFixed(2) + '%';
+                        else if (isDecimal) finalDisplay = target.toFixed(4);
+                        else finalDisplay = target.toLocaleString();
+                        el.innerText = finalDisplay;
+                    }
+                };
+                requestAnimationFrame(updateNumber);
+            });
         });
         // Wait for body to be available, then observe
         if(parentDoc.body) {
