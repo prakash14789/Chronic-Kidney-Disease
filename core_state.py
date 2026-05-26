@@ -299,72 +299,76 @@ def inject_premium_js():
         parentDoc.head.appendChild(script);
     }
 
-    // 2. Vanilla Tilt & Animated Numbers (via MutationObserver)
+    // 2. Vanilla Tilt & Animated Numbers
     if (!parentDoc.getElementById('vanilla-tilt-script')) {
         const tiltScript = parentDoc.createElement('script');
         tiltScript.id = 'vanilla-tilt-script';
         tiltScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.1/vanilla-tilt.min.js';
         parentDoc.head.appendChild(tiltScript);
-        
-        const observer = new MutationObserver((mutations) => {
-            // Vanilla Tilt
-            if (window.parent.VanillaTilt) {
-                const cards = parentDoc.querySelectorAll('.tilt-card:not(.tilt-applied), .kpi-box:not(.tilt-applied), .metric-card:not(.tilt-applied), .glass-card:not(.tilt-applied)');
-                if (cards.length > 0) {
-                    window.parent.VanillaTilt.init(cards, {
-                        max: 12,
-                        speed: 400,
-                        glare: true,
-                        "max-glare": 0.2,
-                        scale: 1.03
-                    });
-                    cards.forEach(c => c.classList.add('tilt-applied'));
-                }
+    }
+    
+    const applyPremiumEffects = () => {
+        // Vanilla Tilt
+        if (window.parent.VanillaTilt) {
+            const cards = parentDoc.querySelectorAll('.tilt-card:not(.tilt-applied), .kpi-box:not(.tilt-applied), .metric-card:not(.tilt-applied), .glass-card:not(.tilt-applied)');
+            if (cards.length > 0) {
+                window.parent.VanillaTilt.init(cards, {
+                    max: 12, speed: 400, glare: true, "max-glare": 0.2, scale: 1.03
+                });
+                cards.forEach(c => c.classList.add('tilt-applied'));
             }
+        }
+        
+        // Number Animation
+        const numbers = parentDoc.querySelectorAll('.animate-number:not(.anim-applied)');
+        numbers.forEach(el => {
+            el.classList.add('anim-applied');
+            const target = parseFloat(el.getAttribute('data-target'));
+            if (isNaN(target)) return;
+            const isPercent = el.getAttribute('data-percent') === 'true';
+            const isDecimal = el.getAttribute('data-decimal') === 'true';
+            const duration = 2000;
             
-            // Number Animation (Independent of VanillaTilt)
-            const numbers = parentDoc.querySelectorAll('.animate-number:not(.anim-applied)');
-            numbers.forEach(el => {
-                el.classList.add('anim-applied');
-                const target = parseFloat(el.getAttribute('data-target'));
-                const isPercent = el.getAttribute('data-percent') === 'true';
-                const isDecimal = el.getAttribute('data-decimal') === 'true';
-                const duration = 2000; // 2 seconds
+            let start = null;
+            const updateNumber = (currentTime) => {
+                if (!start) start = currentTime;
+                const elapsed = currentTime - start;
+                const progress = Math.min(elapsed / duration, 1);
+                const easeProgress = 1 - Math.pow(1 - progress, 4);
+                const current = target * easeProgress;
                 
-                let start = null;
-                const updateNumber = (currentTime) => {
-                    if (!start) start = currentTime;
-                    const elapsed = currentTime - start;
-                    const progress = Math.min(elapsed / duration, 1);
-                    const easeProgress = 1 - Math.pow(1 - progress, 4); // Quartic ease out
-                    const current = target * easeProgress;
-                    
-                    let display = current;
-                    if (isPercent) display = current.toFixed(2) + '%';
-                    else if (isDecimal) display = current.toFixed(4);
-                    else display = Math.floor(current).toLocaleString();
-                    
-                    el.innerText = display;
-                    
-                    if (progress < 1) {
-                        requestAnimationFrame(updateNumber);
-                    } else {
-                        let finalDisplay = target;
-                        if (isPercent) finalDisplay = target.toFixed(2) + '%';
-                        else if (isDecimal) finalDisplay = target.toFixed(4);
-                        else finalDisplay = target.toLocaleString();
-                        el.innerText = finalDisplay;
-                    }
-                };
-                requestAnimationFrame(updateNumber);
-            });
+                let display = current;
+                if (isPercent) display = current.toFixed(2) + '%';
+                else if (isDecimal) display = current.toFixed(4);
+                else display = Math.floor(current).toLocaleString();
+                
+                el.innerText = display;
+                
+                if (progress < 1) {
+                    requestAnimationFrame(updateNumber);
+                } else {
+                    if (isPercent) el.innerText = target.toFixed(2) + '%';
+                    else if (isDecimal) el.innerText = target.toFixed(4);
+                    else el.innerText = target.toLocaleString();
+                }
+            };
+            requestAnimationFrame(updateNumber);
         });
-        // Wait for body to be available, then observe
-        if(parentDoc.body) {
-            observer.observe(parentDoc.body, { childList: true, subtree: true });
+    };
+
+    // Run immediately for already rendered elements
+    applyPremiumEffects();
+    
+    // Setup global MutationObserver
+    if (!window.parent.ckdObserver) {
+        window.parent.ckdObserver = new MutationObserver(() => {
+            applyPremiumEffects();
+        });
+        if (parentDoc.body) {
+            window.parent.ckdObserver.observe(parentDoc.body, { childList: true, subtree: true });
         } else {
             parentDoc.addEventListener('DOMContentLoaded', () => {
-                observer.observe(parentDoc.body, { childList: true, subtree: true });
+                window.parent.ckdObserver.observe(parentDoc.body, { childList: true, subtree: true });
             });
         }
     }
