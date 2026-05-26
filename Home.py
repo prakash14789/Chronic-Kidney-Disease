@@ -1,6 +1,7 @@
 import streamlit as st
 import app_tabs
-from core_state import inject_custom_css, check_login, setup_sidebar, run_full_pipeline, viz
+from core_state import inject_custom_css, check_login, setup_sidebar, run_full_pipeline, viz, load_lottieurl
+from streamlit_lottie import st_lottie
 
 # Must be the very first Streamlit command
 st.set_page_config(page_title="CKD Intelligence Dashboard", page_icon="🏠", layout="wide")
@@ -17,7 +18,15 @@ sample_size, use_cv = setup_sidebar("Home")
 best_name = res_nl.iloc[0]["Model"]
 ckd_pct = df_full['Diagnosis'].mean() * 100
 
-st.markdown("<h1 style='text-align: center; margin-bottom: 30px; font-weight: 800; letter-spacing: -0.05em;'>🧬 CKD Clinical Intelligence</h1>", unsafe_allow_html=True)
+hc1, hc2, hc3 = st.columns([1, 2, 1])
+with hc2:
+    lottie_dna = load_lottieurl("https://lottie.host/7900b8bf-dc7d-4581-91a6-733c0d7ff3eb/uU59NlWv7Z.json")
+    if lottie_dna:
+        st_lottie(lottie_dna, height=120, key="home_lottie")
+    else:
+        st.markdown("<div style='text-align: center;'><span style='font-size: 3rem;'>🧬</span></div>", unsafe_allow_html=True)
+
+st.markdown("<h1 style='text-align: center; margin-top: -15px; margin-bottom: 30px; font-weight: 800; letter-spacing: -0.05em;'>CKD Clinical Intelligence</h1>", unsafe_allow_html=True)
 
 st.markdown(f"""
 <div class='kpi-row'>

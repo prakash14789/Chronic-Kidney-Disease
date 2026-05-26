@@ -9,6 +9,19 @@ def _premium_plotly_chart(figure_or_data, use_container_width=False, theme=None,
 st.plotly_chart = _premium_plotly_chart
 
 import streamlit.components.v1 as components
+import requests
+from streamlit_lottie import st_lottie
+
+@st.cache_data
+def load_lottieurl(url: str):
+    try:
+        r = requests.get(url)
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except:
+        return None
+
 from data_processor import CKDDataProcessor
 from model_trainer import CKDModelTrainer
 from visualizer import CKDVisualizer, COLORS
@@ -389,9 +402,14 @@ def check_login():
     if not st.session_state['logged_in']:
         col1, col2, col3 = st.columns([1, 1.5, 1])
         with col2:
+            lottie_medical = load_lottieurl("https://lottie.host/7900b8bf-dc7d-4581-91a6-733c0d7ff3eb/uU59NlWv7Z.json")
+            if lottie_medical:
+                st_lottie(lottie_medical, height=150, key="login_lottie")
+            else:
+                st.markdown("<div style='text-align: center;'><span style='font-size: 3rem;'>🧬</span></div>", unsafe_allow_html=True)
+            
             st.markdown("""
-                <div style='background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(16px); padding: 30px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); margin-top: 50px; margin-bottom: 20px; text-align: center;'>
-                    <span style='font-size: 3rem;'>🧬</span>
+                <div style='background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(16px); padding: 30px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 20px; text-align: center;'>
                     <h2 style='color: #f8fafc; margin-top: 10px; font-weight: 700; letter-spacing: -0.05em;'>Clinical Portal</h2>
                     <p style='color: #94a3b8; font-size: 0.9rem;'>Chronic Kidney Disease Intelligence</p>
                 </div>
