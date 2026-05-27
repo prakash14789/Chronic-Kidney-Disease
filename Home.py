@@ -18,15 +18,15 @@ sample_size, use_cv = setup_sidebar("Home")
 best_name = res_nl.iloc[0]["Model"]
 ckd_pct = df_full['Diagnosis'].mean() * 100
 
-hc1, hc2, hc3 = st.columns([1, 2, 1])
-with hc2:
-    lottie_dna = load_lottie_file("assets/loading.json")
-    if lottie_dna:
-        st_lottie(lottie_dna, height=120, key="home_lottie")
-    else:
-        st.markdown("<div style='text-align: center;'><span style='font-size: 3rem;'>🧬</span></div>", unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align: center; margin-top: -15px; margin-bottom: 30px; font-weight: 800; letter-spacing: -0.05em;'>CKD Clinical Intelligence</h1>", unsafe_allow_html=True)
+st.markdown(f"""
+<div class='welcome-card'>
+    <h1 style='margin: 0; font-weight: 800; font-family: "Space Grotesk", sans-serif; font-size: 2.8rem;'>🧬 Chronic Kidney Disease Clinical Intelligence</h1>
+    <p style='color: #94a3b8; font-size: 1.15rem; margin-top: 10px; margin-bottom: 0;'>
+        Predictive clinical intelligence portal powered by machine learning. High-fidelity risk analysis, feature impact explainability, and treatment simulation.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown(f"""
 <div class='kpi-row'>

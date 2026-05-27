@@ -248,16 +248,109 @@ def inject_custom_css():
             animation: pulseGlow 1.5s infinite;
         }}
         
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {{
+            width: 8px;
+            height: 8px;
+        }}
+        ::-webkit-scrollbar-track {{
+            background: rgba(11, 17, 32, 0.5);
+        }}
+        ::-webkit-scrollbar-thumb {{
+            background: rgba(139, 92, 246, 0.4);
+            border-radius: 4px;
+        }}
+        ::-webkit-scrollbar-thumb:hover {{
+            background: rgba(139, 92, 246, 0.7);
+        }}
+
+        /* Custom Streamlit Tabs Styling */
+        div[data-testid="stTabBar"] {{
+            background: rgba(15, 23, 42, 0.5) !important;
+            border-radius: 16px !important;
+            padding: 8px !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            backdrop-filter: blur(16px) !important;
+            margin-bottom: 25px !important;
+        }}
+        div[data-testid="stTabBar"] button {{
+            border-radius: 10px !important;
+            color: #94a3b8 !important;
+            transition: all 0.3s ease !important;
+            font-weight: 600 !important;
+            border: none !important;
+            padding: 10px 20px !important;
+        }}
+        div[data-testid="stTabBar"] button:hover {{
+            color: #f8fafc !important;
+            background: rgba(255, 255, 255, 0.05) !important;
+        }}
+        div[data-testid="stTabBar"] button[aria-selected="true"] {{
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(59, 130, 246, 0.25)) !important;
+            color: #f8fafc !important;
+            border-bottom: 2px solid {COLORS["primary"]} !important;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.2) !important;
+        }}
+
+        /* Form, Inputs, and Selectors Styling */
+        div[data-testid="stForm"] {{
+            background: rgba(15, 23, 42, 0.3) !important;
+            border-radius: 24px !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            padding: 30px !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+        }}
+        .stNumberInput input, .stTextInput input, .stSelectbox [role="combobox"], .stSlider [role="slider"] {{
+            background-color: rgba(15, 20, 35, 0.6) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-radius: 12px !important;
+            color: #f8fafc !important;
+            transition: all 0.3s ease !important;
+            padding: 10px 14px !important;
+        }}
+        .stNumberInput input:focus, .stTextInput input:focus, .stSelectbox [role="combobox"]:focus {{
+            border-color: {COLORS["primary"]} !important;
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.3) !important;
+        }}
+        /* Checkbox styling */
+        label[data-testid="stWidgetLabel"] p {{
+            font-weight: 500 !important;
+            color: #e2e8f0 !important;
+        }}
+        div[data-testid="stCheckbox"] label {{
+            background: rgba(255, 255, 255, 0.03) !important;
+            padding: 8px 16px !important;
+            border-radius: 10px !important;
+            border: 1px solid rgba(255, 255, 255, 0.05) !important;
+            transition: all 0.2s ease !important;
+        }}
+        div[data-testid="stCheckbox"] label:hover {{
+            background: rgba(255, 255, 255, 0.07) !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+        }}
+        
         /* Sidebar styling */
         [data-testid="stSidebar"] {{
-            background: rgba(11, 17, 32, 0.4) !important;
+            background: rgba(11, 17, 32, 0.6) !important;
             backdrop-filter: blur(40px);
             border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
         }}
+        [data-testid="stSidebar"] .stButton>button {{
+            background: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: #f8fafc !important;
+            box-shadow: none !important;
+        }}
+        [data-testid="stSidebar"] .stButton>button:hover {{
+            background: linear-gradient(135deg, {COLORS["primary"]}, {COLORS["secondary"]}) !important;
+            border: none !important;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3) !important;
+        }}
         
         /* Gradient Headers */
-        h1, h2, h3 {{
+        h1, h2, h3, h4 {{
             letter-spacing: -0.05em;
+            font-weight: 700;
         }}
         
         .stMarkdown h1 {{
@@ -266,6 +359,30 @@ def inject_custom_css():
             -webkit-text-fill-color: transparent;
             font-weight: 800;
             text-align: center;
+        }}
+
+        /* Banner Image Glow Styling */
+        .banner-img img {{
+            border-radius: 24px !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(139, 92, 246, 0.25) !important;
+            margin-bottom: 25px !important;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+        }}
+        .banner-img img:hover {{
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(139, 92, 246, 0.45) !important;
+            transform: scale(1.01) !important;
+        }}
+        
+        /* Interactive Welcome Card */
+        .welcome-card {{
+            background: rgba(15, 20, 35, 0.45) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 20px !important;
+            padding: 24px !important;
+            margin-bottom: 30px !important;
+            text-align: center;
+            backdrop-filter: blur(20px) !important;
         }}
         </style>
     """, unsafe_allow_html=True)

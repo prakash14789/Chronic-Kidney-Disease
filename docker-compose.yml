@@ -10,7 +10,7 @@ services:
       - ./data:/app/data
       - ./saved_models:/app/saved_models
       - ./reports:/app/reports
-    command: streamlit run app.py --server.address=0.0.0.0
+    command: streamlit run Home.py --server.address=0.0.0.0
     restart: unless-stopped
     depends_on:
       - api

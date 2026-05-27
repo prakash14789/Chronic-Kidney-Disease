@@ -25,4 +25,4 @@ RUN mkdir -p /app/data /app/saved_models /app/reports
 EXPOSE 8501 8000
 
 # The command is overridden by docker-compose, but we provide a default
-CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "Home.py", "--server.address=0.0.0.0"]

@@ -69,7 +69,7 @@ Here's every file in the project and what it does:
 
 ```
 CKD/
-├── app.py                        ← 🖥️  The Dashboard (what users see)
+├── Home.py                       ← 🖥️  The Dashboard (what users see)
 ├── data_processor.py             ← 📦  Loads & prepares the data
 ├── model_trainer.py              ← 🤖  Trains & evaluates AI models
 ├── visualizer.py                 ← 📊  Creates all charts & graphs
@@ -122,7 +122,7 @@ Charts it creates:
 - Population risk distribution
 - And more...
 
-### 🖥️ `app.py` — The Dashboard
+### 🖥️ `Home.py` — The Dashboard
 **Role:** The main file that runs the web application. It ties everything together.
 
 It creates 8 tabs:
@@ -241,7 +241,7 @@ Here's exactly what happens when someone opens the dashboard:
     STEP 6: BUILD THE DASHBOARD
     ───────────────────────────
     ┌──────────────────────────────────────────────┐
-    │                  app.py                       │
+    │                  Home.py                      │
     │  + visualizer.py (creates all charts)         │
     │                                              │
     │  8 Interactive Tabs:                          │
@@ -270,7 +270,7 @@ Here's exactly what happens when someone opens the dashboard:
 
 ```
                     ┌──────────────────────┐
-                    │       app.py         │  ← The main dashboard file
+                    │       Home.py        │  ← The main dashboard file
                     │   (Streamlit App)    │
                     └──────┬───┬───┬───────┘
                            │   │   │
@@ -301,7 +301,7 @@ Here's exactly what happens when someone opens the dashboard:
 
 ### The connection in plain English:
 
-1. **`app.py`** is the boss — it calls the other three files
+1. **`Home.py`** is the boss — it calls the other three files
 2. **`data_processor.py`** is called first to load and prepare the data
 3. **`model_trainer.py`** is called next to train models and get predictions
 4. **`visualizer.py`** is called throughout to create charts from the results
@@ -451,7 +451,7 @@ This is the **star feature**. A doctor can:
 
 5. **Run the dashboard**:
    ```bash
-   streamlit run app.py
+    streamlit run Home.py
    ```
 
 6. **Open your browser** — Streamlit will show a URL (usually `http://localhost:8501`). Open it and you'll see the dashboard!
