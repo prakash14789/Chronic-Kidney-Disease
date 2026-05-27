@@ -633,6 +633,19 @@ def setup_sidebar(page_name="Home"):
             }
         }
         
+        # Initialize session state if not present
+        if "global_search_nav" not in st.session_state:
+            st.session_state.global_search_nav = ""
+            
+        # Handle search selection immediately *before* drawing the widget in this rerun frame
+        if st.session_state.global_search_nav != "":
+            val = st.session_state.global_search_nav
+            target = search_tabs[val]
+            if target["tab_key"]:
+                st.session_state[target["tab_key"]] = target["tab_val"]
+            st.session_state.global_search_nav = ""
+            st.switch_page(target["page"])
+            
         # Render Searchbox at the absolute top of the sidebar
         selected_nav = st.selectbox(
             "🔍 Search Navigation...",
@@ -640,14 +653,6 @@ def setup_sidebar(page_name="Home"):
             format_func=lambda x: "Type to search tabs..." if x == "" else x,
             key="global_search_nav"
         )
-        
-        # Handle search selection immediately during script execution
-        if selected_nav != "":
-            target = search_tabs[selected_nav]
-            if target["tab_key"]:
-                st.session_state[target["tab_key"]] = target["tab_val"]
-            st.session_state.global_search_nav = ""
-            st.switch_page(target["page"])
             
         st.divider()
         st.title("🧬 CKD Intelligence")
