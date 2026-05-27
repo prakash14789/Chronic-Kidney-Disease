@@ -563,9 +563,6 @@ def check_login():
 
 def setup_sidebar(page_name="Home"):
     with st.sidebar:
-        st.title("🧬 CKD Intelligence")
-        st.image("https://cdn-icons-png.flaticon.com/512/3067/3067451.png", width=80)
-        
         # Search Navigation Map
         search_tabs = {
             "Home - Data Audit": {"page": "Home.py", "tab_key": None, "tab_val": None},
@@ -636,23 +633,25 @@ def setup_sidebar(page_name="Home"):
             }
         }
         
-        def on_search_change():
-            val = st.session_state.global_search_nav
-            if val and val != "":
-                target = search_tabs[val]
-                if target["tab_key"]:
-                    st.session_state[target["tab_key"]] = target["tab_val"]
-                st.session_state.global_search_nav = ""
-                st.switch_page(target["page"])
-
-        st.selectbox(
+        # Render Searchbox at the absolute top of the sidebar
+        selected_nav = st.selectbox(
             "🔍 Search Navigation...",
             options=[""] + list(search_tabs.keys()),
             format_func=lambda x: "Type to search tabs..." if x == "" else x,
-            key="global_search_nav",
-            on_change=on_search_change
+            key="global_search_nav"
         )
+        
+        # Handle search selection immediately during script execution
+        if selected_nav != "":
+            target = search_tabs[selected_nav]
+            if target["tab_key"]:
+                st.session_state[target["tab_key"]] = target["tab_val"]
+            st.session_state.global_search_nav = ""
+            st.switch_page(target["page"])
+            
         st.divider()
+        st.title("🧬 CKD Intelligence")
+        st.image("https://cdn-icons-png.flaticon.com/512/3067/3067451.png", width=80)
 
         sample_size = st.slider("Stratified Sample Size", 1000, 10000, 5000, key="global_sample")
         use_cv = st.checkbox("Enable Cross-Validation (Slower)", value=False, key="global_cv")
