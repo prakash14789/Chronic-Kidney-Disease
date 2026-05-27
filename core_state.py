@@ -565,6 +565,95 @@ def setup_sidebar(page_name="Home"):
     with st.sidebar:
         st.title("🧬 CKD Intelligence")
         st.image("https://cdn-icons-png.flaticon.com/512/3067/3067451.png", width=80)
+        
+        # Search Navigation Map
+        search_tabs = {
+            "Home - Data Audit": {"page": "Home.py", "tab_key": None, "tab_val": None},
+            "Model Analytics - Experiment 1 (Full Features)": {
+                "page": "pages/1_🚀_Model_Analytics.py",
+                "tab_key": "active_tab_model_analytics",
+                "tab_val": "🚀 Exp 1 (Full Features)"
+            },
+            "Model Analytics - Experiment 2 (No-Leakage)": {
+                "page": "pages/1_🚀_Model_Analytics.py",
+                "tab_key": "active_tab_model_analytics",
+                "tab_val": "🛡️ Exp 2 (No-Leakage)"
+            },
+            "Model Analytics - Leakage Comparison": {
+                "page": "pages/1_🚀_Model_Analytics.py",
+                "tab_key": "active_tab_model_analytics",
+                "tab_val": "📉 Leakage Comparison"
+            },
+            "Model Analytics - SMOTE Insights": {
+                "page": "pages/1_🚀_Model_Analytics.py",
+                "tab_key": "active_tab_model_analytics",
+                "tab_val": "🧬 SMOTE Insights"
+            },
+            "Model Analytics - Optuna Hyperparameter Tuning": {
+                "page": "pages/1_🚀_Model_Analytics.py",
+                "tab_key": "active_tab_model_analytics",
+                "tab_val": "⚡ Optuna Tuning"
+            },
+            "Interpretability - Decision Threshold Tuning": {
+                "page": "pages/2_🧠_Interpretability.py",
+                "tab_key": "active_tab_interpretability",
+                "tab_val": "🎯 Threshold Tuning"
+            },
+            "Interpretability - Global SHAP Explanations": {
+                "page": "pages/2_🧠_Interpretability.py",
+                "tab_key": "active_tab_interpretability",
+                "tab_val": "🧠 Global SHAP"
+            },
+            "Interpretability - Deep Error & Population Analysis": {
+                "page": "pages/2_🧠_Interpretability.py",
+                "tab_key": "active_tab_interpretability",
+                "tab_val": "🔬 Deep Analysis"
+            },
+            "Clinical Tools - Patient Diagnosis Portal": {
+                "page": "pages/3_🏥_Clinical_Tools.py",
+                "tab_key": "active_tab_clinical_tools",
+                "tab_val": "🏥 Patient Diagnosis"
+            },
+            "Clinical Tools - Batch Diagnosis (CSV Upload)": {
+                "page": "pages/3_🏥_Clinical_Tools.py",
+                "tab_key": "active_tab_clinical_tools",
+                "tab_val": "📂 Batch Diagnosis"
+            },
+            "Clinical Tools - KDIGO CKD Staging": {
+                "page": "pages/3_🏥_Clinical_Tools.py",
+                "tab_key": "active_tab_clinical_tools",
+                "tab_val": "🏗️ CKD Staging"
+            },
+            "Clinical Tools - 5-Year Risk Timeline Simulator": {
+                "page": "pages/3_🏥_Clinical_Tools.py",
+                "tab_key": "active_tab_clinical_tools",
+                "tab_val": "📈 Risk Timeline"
+            },
+            "Clinical Tools - Patient History Logs": {
+                "page": "pages/3_🏥_Clinical_Tools.py",
+                "tab_key": "active_tab_clinical_tools",
+                "tab_val": "📚 Patient History"
+            }
+        }
+        
+        def on_search_change():
+            val = st.session_state.global_search_nav
+            if val and val != "":
+                target = search_tabs[val]
+                if target["tab_key"]:
+                    st.session_state[target["tab_key"]] = target["tab_val"]
+                st.session_state.global_search_nav = ""
+                st.switch_page(target["page"])
+
+        st.selectbox(
+            "🔍 Search Navigation...",
+            options=[""] + list(search_tabs.keys()),
+            format_func=lambda x: "Type to search tabs..." if x == "" else x,
+            key="global_search_nav",
+            on_change=on_search_change
+        )
+        st.divider()
+
         sample_size = st.slider("Stratified Sample Size", 1000, 10000, 5000, key="global_sample")
         use_cv = st.checkbox("Enable Cross-Validation (Slower)", value=False, key="global_cv")
         st.divider()

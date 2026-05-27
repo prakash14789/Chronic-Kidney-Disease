@@ -24,7 +24,7 @@ st.markdown("Precision tools for patient diagnosis, batch risk assessment, and l
 t1, t2, t3, t4, t5 = st.tabs([
     "🏥 Patient Diagnosis", "📂 Batch Diagnosis", "🏗️ CKD Staging",
     "📈 Risk Timeline", "📚 Patient History"
-])
+], key="active_tab_clinical_tools", on_change="rerun")
 
 with t1:
     app_tabs.render_patient_diagnosis(X_te_nl, trained_nl, best_name, best_th, trainer, viz, reporter, get_cached_shap, y_proba_all, X_tr_nl, y_tr_f)

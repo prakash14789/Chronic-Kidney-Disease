@@ -18,7 +18,11 @@ ckd_pct = df_full['Diagnosis'].mean() * 100
 st.title("🚀 Model Analytics")
 st.markdown("Explore detailed machine learning experiments, performance comparisons, and hyperparameter optimization.")
 
-t1, t2, t3, t4, t5 = st.tabs(["🚀 Exp 1 (Full Features)", "🛡️ Exp 2 (No-Leakage)", "📉 Leakage Comparison", "🧬 SMOTE Insights", "⚡ Optuna Tuning"])
+t1, t2, t3, t4, t5 = st.tabs(
+    ["🚀 Exp 1 (Full Features)", "🛡️ Exp 2 (No-Leakage)", "📉 Leakage Comparison", "🧬 SMOTE Insights", "⚡ Optuna Tuning"],
+    key="active_tab_model_analytics",
+    on_change="rerun"
+)
 
 with t1:
     app_tabs.render_exp1(res_f, roc_f, viz)

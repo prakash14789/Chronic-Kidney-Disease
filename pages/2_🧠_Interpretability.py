@@ -19,7 +19,11 @@ y_proba_all = trained_nl[best_name].predict_proba(X_te_nl)[:, 1]
 st.title("🧠 AI Interpretability & Analysis")
 st.markdown("Understand *why* the models make their decisions and where they are prone to errors.")
 
-t1, t2, t3 = st.tabs(["🎯 Threshold Tuning", "🧠 Global SHAP", "🔬 Deep Analysis"])
+t1, t2, t3 = st.tabs(
+    ["🎯 Threshold Tuning", "🧠 Global SHAP", "🔬 Deep Analysis"],
+    key="active_tab_interpretability",
+    on_change="rerun"
+)
 
 with t1:
     app_tabs.render_threshold_tuning(y_te_f, y_proba_all, best_th, trainer, trained_nl, best_name, X_te_nl, viz)
