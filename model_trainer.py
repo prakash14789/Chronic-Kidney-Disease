@@ -166,23 +166,42 @@ class CKDModelTrainer:
             }
 
     def get_shap_explainer(self, model: Any, X_test: pd.DataFrame) -> Tuple[Any, Any, pd.DataFrame]:
-        """Generates SHAP values for the best model."""
+        """Generates SHAP values for the best model with robust scaling and classification handling."""
         import shap
+        import numpy as np
         # Extract clf and transform X if needed
         clf = model.named_steps['clf']
         if 'scaler' in model.named_steps:
             X_trans = model.named_steps['scaler'].transform(X_test)
         else:
-            X_trans = X_test.values
+            X_trans = X_test.values if hasattr(X_test, 'values') else X_test
             
         X_df = pd.DataFrame(X_trans, columns=X_test.columns)
         
+        # ✅ Tree model → TreeExplainer (fast + correct)
+        if hasattr(clf, "feature_importances_"):
+            try:
+                explainer = shap.TreeExplainer(clf)
+                shap_values = explainer.shap_values(X_df)
+                
+                # Classification → take class 1 (CKD positive)
+                if isinstance(shap_values, list):
+                    shap_values = shap_values[1]
+                elif isinstance(shap_values, np.ndarray) and len(shap_values.shape) == 3:
+                    shap_values = shap_values[:, :, 1]
+                return explainer, shap_values, X_df
+            except:
+                pass
+
+        # Fallback for non-tree models (SVM, KNN, Logistic, etc.) or when TreeExplainer fails
         try:
-            explainer = shap.TreeExplainer(clf)
-            shap_values = explainer.shap_values(X_df)
+            explainer = shap.Explainer(clf.predict_proba, X_df)
+            shap_values = explainer(X_df)
+            if len(shap_values.shape) == 3:
+                shap_values = shap_values[:, :, 1]
             return explainer, shap_values, X_df
         except:
-            # Fallback to KernelExplainer if TreeExplainer fails
+            # Final fallback
             explainer = shap.Explainer(clf, X_df)
             shap_values = explainer(X_df)
             return explainer, shap_values, X_df
