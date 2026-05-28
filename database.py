@@ -1,6 +1,6 @@
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy_utils import StringEncryptedType
@@ -28,7 +28,7 @@ class AuditLog(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     action = Column(String(100)) # e.g., "VIEW_PATIENT", "PREDICT_RISK", "EXPORT_PDF"
     target_patient_id = Column(String(50), nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     details = Column(String(255), nullable=True)
 
 class PatientRecord(Base):
@@ -43,7 +43,7 @@ class PatientRecord(Base):
     # Encrypting PII/sensitive info at rest
     clinical_action = Column(StringEncryptedType(String(200), ENCRYPTION_KEY, FernetEngine))
     features = Column(StringEncryptedType(String(5000), ENCRYPTION_KEY, FernetEngine)) # Store raw features as encrypted JSON string
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 # Using SQLite for simplicity in this demo
 DB_DIR = "data"
