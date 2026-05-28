@@ -660,6 +660,19 @@ def setup_sidebar(page_name="Home"):
 
         sample_size = st.slider("Stratified Sample Size", 1000, 10000, 5000, key="global_sample")
         use_cv = st.checkbox("Enable Cross-Validation (Slower)", value=False, key="global_cv")
+        
+        if 'best_model_obj' in st.session_state:
+            st.divider()
+            if st.button("💾 Save Best Model for API", use_container_width=True):
+                model_path = trainer.save_model_for_api(
+                    st.session_state['best_model_obj'],
+                    st.session_state['best_model_features'],
+                    st.session_state['best_model_name'],
+                    st.session_state['best_model_th'],
+                    metrics=st.session_state['best_model_metrics']
+                )
+                st.toast(f"✅ Saved {st.session_state['best_model_name']} to registry!")
+                
         st.divider()
         st.markdown("[🔗 View Source on GitHub](https://github.com/prakash14789/Chronic-Kidney-Disease)")
         st.success("v3.3 Research Pipeline Active")
@@ -704,3 +717,16 @@ def run_full_pipeline(sample_n, use_cv=False):
 @st.cache_resource
 def get_cached_shap(_model, X_test):
     return trainer.get_shap_explainer(_model, X_test)
+
+def save_best_model_state(res_nl, trained_nl, best_th, X_te_nl):
+    best_name = res_nl.iloc[0]["Model"]
+    st.session_state['best_model_obj'] = trained_nl[best_name]
+    st.session_state['best_model_name'] = best_name
+    st.session_state['best_model_th'] = best_th
+    st.session_state['best_model_features'] = X_te_nl.columns.tolist()
+    
+    best_metrics = res_nl.iloc[0].to_dict()
+    for k, v in best_metrics.items():
+        if not isinstance(v, (int, float, str, bool, type(None))):
+            best_metrics[k] = str(v)
+    st.session_state['best_model_metrics'] = best_metrics

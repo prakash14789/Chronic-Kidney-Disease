@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
 import app_tabs
-from core_state import inject_custom_css, check_login, setup_sidebar, run_full_pipeline, get_cached_shap, viz, trainer
+from core_state import inject_custom_css, check_login, setup_sidebar, run_full_pipeline, get_cached_shap, viz, trainer, save_best_model_state
 
 st.set_page_config(page_title="Interpretability", page_icon="🧠", layout="wide")
 
@@ -12,6 +12,7 @@ sample_size, use_cv = setup_sidebar("Interpretability")
 # Fetch cached data
 (df_full, df_sample, res_f, roc_f, res_nl, roc_nl, pr_nl,
  trained_nl, X_tr_nl, X_te_nl, y_tr_f, y_te_f, best_th, res_no_smote) = run_full_pipeline(sample_size, use_cv=use_cv)
+save_best_model_state(res_nl, trained_nl, best_th, X_te_nl)
 
 best_name = res_nl.iloc[0]["Model"]
 y_proba_all = trained_nl[best_name].predict_proba(X_te_nl)[:, 1]

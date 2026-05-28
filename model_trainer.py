@@ -432,15 +432,60 @@ class CKDModelTrainer:
 
     # ── MODEL SAVING FOR API ──────────────────────────────────
     @staticmethod
-    def save_model_for_api(model: Any, feature_names: List[str], model_name: str, threshold: float, output_dir: str = "saved_models") -> str:
-        """Save trained model and metadata for the FastAPI endpoint."""
-        import joblib, os
+    def save_model_for_api(model: Any, feature_names: List[str], model_name: str, threshold: float, metrics: Dict[str, Any] = None, output_dir: str = "saved_models") -> str:
+        """Save trained model and metadata for the FastAPI endpoint, and log the run to the registry."""
+        import joblib, os, json
+        from datetime import datetime, timezone
+        
         os.makedirs(output_dir, exist_ok=True)
         joblib.dump(model, os.path.join(output_dir, "best_model.pkl"))
         joblib.dump(list(feature_names), os.path.join(output_dir, "feature_names.pkl"))
-        joblib.dump({
+        
+        meta = {
             "model_name": model_name,
             "threshold": float(threshold),
             "features_count": len(feature_names),
-        }, os.path.join(output_dir, "model_meta.pkl"))
+        }
+        joblib.dump(meta, os.path.join(output_dir, "model_meta.pkl"))
+        
+        # Log to the run registry
+        registry_path = os.path.join(output_dir, "training_registry.json")
+        
+        # Extract hyperparameters
+        try:
+            if hasattr(model, 'named_steps') and 'clf' in model.named_steps:
+                clf = model.named_steps['clf']
+                hyperparameters = {k: str(v) for k, v in clf.get_params().items() if not k.startswith('_') and not hasattr(v, 'get_params')}
+            else:
+                hyperparameters = {k: str(v) for k, v in model.get_params().items() if not k.startswith('_') and not hasattr(v, 'get_params')}
+        except Exception:
+            hyperparameters = {}
+            
+        run_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "model_name": model_name,
+            "threshold": float(threshold),
+            "features_count": len(feature_names),
+            "hyperparameters": hyperparameters,
+            "metrics": metrics or {}
+        }
+        
+        # Load existing registry
+        registry = []
+        if os.path.exists(registry_path):
+            try:
+                with open(registry_path, "r", encoding="utf-8") as f:
+                    registry = json.load(f)
+            except Exception:
+                registry = []
+                
+        registry.append(run_entry)
+        
+        # Save updated registry
+        try:
+            with open(registry_path, "w", encoding="utf-8") as f:
+                json.dump(registry, f, indent=4)
+        except Exception as e:
+            print(f"Failed to write training registry log: {e}")
+            
         return os.path.join(output_dir, "best_model.pkl")

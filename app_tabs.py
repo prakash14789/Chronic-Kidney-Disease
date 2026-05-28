@@ -744,3 +744,61 @@ def render_patient_history(viz: Any):
         # Display table
         st.subheader("Visit Log")
         st.dataframe(history_df, use_container_width=True)
+
+def render_model_registry(output_dir="saved_models"):
+    import os
+    import json
+    st.header("📋 Model Registry Log")
+    st.info("Historical training runs, hyperparameter choices, and metrics saved to the local registry.")
+    
+    registry_path = os.path.join(output_dir, "training_registry.json")
+    if not os.path.exists(registry_path):
+        st.warning("No runs logged in the registry yet. Save a model using the sidebar button to log a training run.")
+        return
+        
+    try:
+        with open(registry_path, "r", encoding="utf-8") as f:
+            registry = json.load(f)
+    except Exception as e:
+        st.error(f"Error loading registry: {e}")
+        return
+        
+    if not registry:
+        st.info("Registry is currently empty.")
+        return
+        
+    # Reverse list so the latest runs are shown first
+    registry_reversed = list(reversed(registry))
+    
+    # Format table for display
+    rows = []
+    for idx, run in enumerate(registry_reversed):
+        metrics = run.get("metrics", {})
+        rows.append({
+            "Run ID": len(registry) - idx,
+            "Timestamp (UTC)": run.get("timestamp", "").split(".")[0].replace("T", " "),
+            "Model Name": run.get("model_name", "unknown"),
+            "Accuracy": metrics.get("Accuracy", "N/A"),
+            "Balanced Accuracy": metrics.get("Balanced Accuracy", "N/A"),
+            "Macro F1": metrics.get("Macro F1", "N/A"),
+            "ROC-AUC": metrics.get("ROC-AUC", "N/A"),
+            "Threshold": run.get("threshold", "N/A"),
+            "Features Count": run.get("features_count", "N/A")
+        })
+        
+    df_registry = pd.DataFrame(rows)
+    st.dataframe(df_registry, use_container_width=True)
+    
+    # Allow expanding details for each run
+    st.subheader("🔍 Run Details (Hyperparameters & Features)")
+    selected_id = st.selectbox("Select Run ID to Inspect", options=df_registry["Run ID"].tolist())
+    
+    selected_run = registry[selected_id - 1]
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("##### Model Hyperparameters")
+        st.json(selected_run.get("hyperparameters", {}))
+    with col2:
+        st.write("##### Logged Metrics")
+        st.json(selected_run.get("metrics", {}))
