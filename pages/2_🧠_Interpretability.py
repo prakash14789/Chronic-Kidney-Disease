@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
-import app_tabs
-from core_state import inject_custom_css, check_login, setup_sidebar, run_full_pipeline, get_cached_shap, viz, trainer, save_best_model_state
+from ckd_app.dashboard import tabs as app_tabs
+from ckd_app.dashboard.state import inject_custom_css, check_login, setup_sidebar, run_full_pipeline, get_cached_shap, viz, trainer, save_best_model_state
 
 st.set_page_config(page_title="Interpretability", page_icon="🧠", layout="wide")
 

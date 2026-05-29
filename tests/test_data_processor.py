@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from data_processor import CKDDataProcessor
+from ckd_app.data.processor import CKDDataProcessor
 
 def test_get_v3_refined_data():
     processor = CKDDataProcessor()

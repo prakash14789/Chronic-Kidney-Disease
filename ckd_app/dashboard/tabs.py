@@ -4,10 +4,10 @@ import numpy as np
 import datetime
 import json
 import plotly.express as px
-from database import save_patient_record, get_patient_history
+from ckd_app.database.secure_db import save_patient_record, get_patient_history
 from sklearn.metrics import balanced_accuracy_score, f1_score, precision_score, recall_score
 from typing import Any, Dict
-from visualizer import COLORS
+from ckd_app.visualization.plotting import COLORS
 def render_data_audit(df_full: pd.DataFrame, df_sample: pd.DataFrame, viz: Any, ckd_pct: float):
     st.header("1. Class Imbalance & Audit")
     col1, col2 = st.columns([1, 2])

@@ -16,7 +16,7 @@ import os
 import logging
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
-from database import log_audit_action, SessionLocal, User, verify_password
+from ckd_app.database.secure_db import log_audit_action, SessionLocal, User, verify_password
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

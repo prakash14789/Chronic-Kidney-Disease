@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api import app, get_current_user
 import api
-from database import User
+from ckd_app.database.secure_db import User
 
 # Override dependency to simulate logged in user
 def override_get_current_user():

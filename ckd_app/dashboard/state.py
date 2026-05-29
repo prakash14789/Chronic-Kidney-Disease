@@ -31,11 +31,11 @@ def load_lottie_file(filepath: str):
     except:
         return None
 
-from data_processor import CKDDataProcessor
-from model_trainer import CKDModelTrainer
-from visualizer import CKDVisualizer, COLORS
-from report_generator import CKDReportGenerator
-from stage_predictor import CKDStagePredictor
+from ckd_app.data.processor import CKDDataProcessor
+from ckd_app.models.trainer import CKDModelTrainer
+from ckd_app.visualization.plotting import CKDVisualizer, COLORS
+from ckd_app.utils.report_generator import CKDReportGenerator
+from ckd_app.models.stage_predictor import CKDStagePredictor
 
 # Initialize instances
 processor = CKDDataProcessor()

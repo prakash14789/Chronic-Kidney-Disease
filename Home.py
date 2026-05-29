@@ -1,6 +1,6 @@
 import streamlit as st
-import app_tabs
-from core_state import inject_custom_css, check_login, setup_sidebar, run_full_pipeline, viz, load_lottie_file, save_best_model_state
+from ckd_app.dashboard import tabs as app_tabs
+from ckd_app.dashboard.state import inject_custom_css, check_login, setup_sidebar, run_full_pipeline, viz, load_lottie_file, save_best_model_state
 from streamlit_lottie import st_lottie
 
 # Must be the very first Streamlit command

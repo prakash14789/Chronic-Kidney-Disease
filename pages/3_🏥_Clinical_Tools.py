@@ -1,6 +1,6 @@
 import streamlit as st
-import app_tabs
-from core_state import (
+from ckd_app.dashboard import tabs as app_tabs
+from ckd_app.dashboard.state import (
     inject_custom_css, check_login, setup_sidebar, run_full_pipeline,
     get_cached_shap, viz, trainer, reporter, save_best_model_state
 )
@@ -34,7 +34,7 @@ with t2:
     app_tabs.render_batch_diagnosis(X_te_nl, trained_nl, best_name, best_th, trainer)
 
 with t3:
-    from stage_predictor import CKDStagePredictor
+    from ckd_app.models.stage_predictor import CKDStagePredictor
     
     @st.cache_data
     def run_stage_pipeline(_df_full, sample_n):
