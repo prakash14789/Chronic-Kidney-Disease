@@ -7,6 +7,7 @@ import plotly.express as px
 from database import save_patient_record, get_patient_history
 from sklearn.metrics import balanced_accuracy_score, f1_score, precision_score, recall_score
 from typing import Any, Dict
+from visualizer import COLORS
 def render_data_audit(df_full: pd.DataFrame, df_sample: pd.DataFrame, viz: Any, ckd_pct: float):
     st.header("1. Class Imbalance & Audit")
     col1, col2 = st.columns([1, 2])
@@ -745,7 +746,7 @@ def render_patient_history(viz: Any):
         st.subheader("Visit Log")
         st.dataframe(history_df, use_container_width=True)
 
-def render_model_registry(output_dir="saved_models"):
+def render_model_registry(viz: Any, output_dir="saved_models"):
     import os
     import json
     st.header("📋 Model Registry Log")
@@ -788,6 +789,43 @@ def render_model_registry(output_dir="saved_models"):
         
     df_registry = pd.DataFrame(rows)
     st.dataframe(df_registry, use_container_width=True)
+    
+    # Compare registry runs visually
+    if len(df_registry) > 1:
+        st.subheader("📊 Performance Comparison of Registered Models")
+        compare_df = df_registry.copy()
+        
+        # Convert metrics to float for comparisons
+        for col in ["Balanced Accuracy", "ROC-AUC", "Macro F1"]:
+            if col in compare_df.columns:
+                compare_df[col] = pd.to_numeric(compare_df[col], errors='coerce')
+                
+        compare_df = compare_df.dropna(subset=["Balanced Accuracy", "ROC-AUC", "Macro F1"])
+        
+        if not compare_df.empty:
+            compare_melt = compare_df.melt(
+                id_vars=["Run ID", "Model Name"],
+                value_vars=[c for c in ["Balanced Accuracy", "ROC-AUC", "Macro F1"] if c in compare_df.columns],
+                var_name="Metric",
+                value_name="Score"
+            )
+            compare_melt["Run Label"] = "Run #" + compare_melt["Run ID"].astype(str) + " - " + compare_melt["Model Name"]
+            
+            fig_compare = px.bar(
+                compare_melt,
+                x="Run Label",
+                y="Score",
+                color="Metric",
+                barmode="group",
+                title="Historical Runs Metric Comparison",
+                color_discrete_map={
+                    "Balanced Accuracy": COLORS["primary"],
+                    "ROC-AUC": COLORS["accent"],
+                    "Macro F1": COLORS["f1"]
+                }
+            )
+            fig_compare.update_layout(yaxis_range=[0.5, 1.05], yaxis_title="Score")
+            st.plotly_chart(viz._apply_dark_theme(fig_compare), use_container_width=True, key="registry_compare")
     
     # Allow expanding details for each run
     st.subheader("🔍 Run Details (Hyperparameters & Features)")

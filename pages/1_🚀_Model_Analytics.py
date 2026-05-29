@@ -41,4 +41,4 @@ with t5:
     app_tabs.render_optuna_tuning(X_tr_nl, y_tr_f, X_te_nl, y_te_f, trainer, viz, res_nl)
 
 with t6:
-    app_tabs.render_model_registry()
+    app_tabs.render_model_registry(viz)

@@ -6,7 +6,7 @@ from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, ExtraTreesClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, ExtraTreesClassifier, StackingClassifier
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
@@ -68,7 +68,29 @@ class CKDModelTrainer:
             base.append(("LightGBM", LGBMClassifier(n_estimators=100, max_depth=6, is_unbalance=True, 
                                                     random_state=self.random_state, verbose=-1), False))
         
-        return [(name, self.build_pipeline(clf, needs_scaling=sc, use_smote=use_smote)) for name, clf, sc in base]
+        pipelines = [(name, self.build_pipeline(clf, needs_scaling=sc, use_smote=use_smote)) for name, clf, sc in base]
+        
+        # Build base estimators for Stacking Ensemble
+        stack_estimators = []
+        stack_estimators.append(("rf", RandomForestClassifier(n_estimators=100, class_weight="balanced", random_state=self.random_state, n_jobs=-1)))
+        stack_estimators.append(("gb", GradientBoostingClassifier(n_estimators=100, subsample=0.8, random_state=self.random_state)))
+        if XGBClassifier:
+            stack_estimators.append(("xgb", XGBClassifier(n_estimators=100, max_depth=6, eval_metric="logloss", 
+                                                          scale_pos_weight=n_neg / max(n_pos, 1), random_state=self.random_state)))
+        if LGBMClassifier:
+            stack_estimators.append(("lgbm", LGBMClassifier(n_estimators=100, max_depth=6, is_unbalance=True, 
+                                                            random_state=self.random_state, verbose=-1)))
+            
+        stack_clf = StackingClassifier(
+            estimators=stack_estimators,
+            final_estimator=LogisticRegression(max_iter=1000, class_weight="balanced", random_state=self.random_state),
+            cv=5,
+            n_jobs=-1
+        )
+        stack_pipeline = self.build_pipeline(stack_clf, needs_scaling=False, use_smote=use_smote)
+        pipelines.append(("Stacking Ensemble", stack_pipeline))
+        
+        return pipelines
 
     def run_v3_experiment(self, X_tr: pd.DataFrame, X_te: pd.DataFrame, y_tr: pd.Series, y_te: pd.Series, pipelines: List[Tuple[str, Any]], use_cv: bool = False) -> Tuple[pd.DataFrame, Dict, Dict, Dict]:
         """EXACT V3 Experiment Runner optimized for speed."""
@@ -455,7 +477,16 @@ class CKDModelTrainer:
         try:
             if hasattr(model, 'named_steps') and 'clf' in model.named_steps:
                 clf = model.named_steps['clf']
-                hyperparameters = {k: str(v) for k, v in clf.get_params().items() if not k.startswith('_') and not hasattr(v, 'get_params')}
+                if isinstance(clf, StackingClassifier):
+                    hyperparameters = {
+                        "base_estimators": ", ".join([name for name, _ in clf.estimators]),
+                        "final_estimator": clf.final_estimator.__class__.__name__,
+                        "cv": str(clf.cv),
+                        "n_jobs": str(clf.n_jobs),
+                        "passthrough": str(clf.passthrough)
+                    }
+                else:
+                    hyperparameters = {k: str(v) for k, v in clf.get_params().items() if not k.startswith('_') and not hasattr(v, 'get_params')}
             else:
                 hyperparameters = {k: str(v) for k, v in model.get_params().items() if not k.startswith('_') and not hasattr(v, 'get_params')}
         except Exception:
