@@ -1,0 +1,46 @@
+KDIGO 2024 Clinical Practice Guideline for the Evaluation and Management of Chronic Kidney Disease (CKD)
+
+SECTION 1: DEFINITION AND CLASSIFICATION OF CKD
+Chronic Kidney Disease (CKD) is defined as abnormalities of kidney structure or function, present for >3 months, with implications for health.
+The criteria for CKD include either a Glomerular Filtration Rate (GFR) of <60 ml/min/1.73 m2 (GFR categories G3a–G5) or markers of kidney damage (such as albuminuria, urine sediment abnormalities, electrolyte abnormalities, histological abnormalities, structural abnormalities, or history of kidney transplantation).
+
+GFR Categories in CKD:
+- G1: Normal or high (GFR >= 90 ml/min/1.73 m2)
+- G2: Mildly decreased (GFR 60-80 ml/min/1.73 m2)
+- G3a: Mildly to moderately decreased (GFR 45-59 ml/min/1.73 m2)
+- G3b: Moderately to severely decreased (GFR 30-44 ml/min/1.73 m2)
+- G4: Severely decreased (GFR 15-29 ml/min/1.73 m2)
+- G5: Kidney failure (GFR < 15 ml/min/1.73 m2 or on dialysis)
+
+Albuminuria Categories in CKD:
+- A1: Normal to mildly increased (AER < 30 mg/24h or ACR < 30 mg/g / < 3 mg/mmol)
+- A2: Moderately increased (AER 30-300 mg/24h or ACR 30-300 mg/g / 3-30 mg/mmol)
+- A3: Severely increased (AER > 300 mg/24h or ACR > 300 mg/g / > 30 mg/mmol)
+
+---
+
+SECTION 2: BLOOD PRESSURE TARGETS FOR CKD PATIENTS
+In adults with high blood pressure and CKD, KDIGO recommends target systolic blood pressure (SBP) of <120 mmHg, when tolerated, using standardized office BP measurement.
+Standardized measurement includes resting the patient for 5 minutes, using the correct cuff size, and supporting the arm at heart level.
+
+Antihypertensive Agents of Choice:
+- For patients with CKD, hypertension, and moderately to severely increased albuminuria (categories A2 and A3) with or without diabetes, KDIGO recommends initiating treatment with a RAS inhibitor (either an ACE inhibitor (ACEi) or an ARB (Angiotensin II Receptor Blocker)).
+- Avoid combining an ACE inhibitor and an ARB, as combination therapy increases the risk of hyperkalemia, acute kidney injury (AKI), and hypotension without providing additional cardiovascular or renal benefits.
+
+---
+
+SECTION 3: DIABETES MANAGEMENT IN CKD PATIENTS
+In patients with type 2 diabetes (T2D) and CKD:
+- KDIGO recommends a first-line treatment regimen combining Metformin and an SGLT2 inhibitor (Sodium-Glucose Cotransporter 2 inhibitor).
+- Metformin should be initiated if eGFR is >= 45 ml/min/1.73 m2, and can be continued down to eGFR of 30 ml/min/1.73 m2. It must be discontinued if eGFR drops below 30 ml/min/1.73 m2 or if the patient is on dialysis.
+- SGLT2 inhibitors (such as Dapagliflozin, Empagliflozin, or Canagliflozin) should be initiated for patients with type 2 diabetes, CKD, and eGFR >= 20 ml/min/1.73 m2. Once initiated, the SGLT2 inhibitor can be continued until the initiation of kidney replacement therapy (dialysis or transplant).
+- For patients with type 2 diabetes and CKD who do not achieve glycemic targets, or who cannot tolerate SGLT2 inhibitors or Metformin, KDIGO recommends using a GLP-1 receptor agonist (Glucagon-Like Peptide-1 receptor agonist) such as Semaglutide or Liraglutide.
+
+---
+
+SECTION 4: LIFESTYLE AND DIETARY RECOMMENDATIONS
+KDIGO recommends lifestyle modifications to reduce CKD progression and cardiovascular risk:
+- Dietary Sodium Intake: KDIGO recommends limiting sodium intake to <2 grams of sodium per day (equivalent to <5 grams of sodium chloride / table salt) in adults with CKD.
+- Protein Intake: For adults with GFR categories G3–G5 who are not on dialysis, KDIGO suggests maintaining a protein intake of 0.8 g/kg body weight per day. Avoid high protein intake (>1.3 g/kg/day) in patients at risk of CKD progression.
+- Physical Activity: KDIGO recommends performing moderate-intensity physical activity for a cumulative duration of at least 150 minutes per week, or to a level compatible with cardiovascular and physical tolerance.
+- Tobacco Cessation: Advise all patients with CKD to quit smoking or tobacco products to reduce cardiovascular risks and slow CKD progression.

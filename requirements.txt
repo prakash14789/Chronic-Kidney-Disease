@@ -25,3 +25,6 @@ python-multipart
 sqlalchemy-utils
 cryptography
 streamlit-lottie
+sentence-transformers
+huggingface-hub
+pypdf

@@ -78,3 +78,38 @@ def test_predict_batch_success():
     assert response.json()["predictions"][0]["risk_level"] == "Low Risk"
     assert response.json()["predictions"][1]["risk_score"] == 0.8
     assert response.json()["predictions"][1]["risk_level"] == "High Risk"
+
+
+def test_rag_query_success(monkeypatch):
+    def mock_query(user_query, token=None):
+        return {
+            "answer": f"Mocked clinical response for: {user_query}",
+            "sources": [{"title": "KDIGO Excerpt", "chunk": 0, "score": 0.95}]
+        }
+    monkeypatch.setattr(api.rag_engine, "query", mock_query)
+    
+    response = client.post("/rag/query", json={"query": "What BP is recommended?"})
+    assert response.status_code == 200
+    assert "Mocked clinical response" in response.json()["answer"]
+    assert len(response.json()["sources"]) == 1
+    assert response.json()["sources"][0]["title"] == "KDIGO Excerpt"
+
+
+def test_rag_upload_success(monkeypatch):
+    mock_called = False
+    def mock_add_document(title, text, category="guidelines"):
+        nonlocal mock_called
+        mock_called = True
+        
+    monkeypatch.setattr(api.rag_engine, "add_document", mock_add_document)
+    
+    response = client.post("/rag/upload", json={
+        "title": "New Guideline Reference",
+        "content": "This is a test kidney guideline.",
+        "category": "guidelines"
+    })
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    assert "successfully indexed" in response.json()["message"]
+    assert mock_called is True
+

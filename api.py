@@ -17,13 +17,27 @@ import logging
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from ckd_app.database.secure_db import log_audit_action, SessionLocal, User, verify_password
+from ckd_app.utils.rag_engine import CKDRAGEngine
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Initialize RAG Engine
+rag_engine = CKDRAGEngine()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Auto-seed RAG if knowledge base JSON doesn't exist
+    db_path = "data/clinical_knowledge_base.json"
+    if not os.path.exists(db_path):
+        logger.info("🌱 Seeding RAG knowledge base on startup...")
+        try:
+            from ckd_app.utils.seed_rag import seed_database
+            seed_database()
+        except Exception as e:
+            logger.error(f"Failed to auto-seed RAG database: {e}")
+            
     loaded = load_models()
     if loaded:
         logger.info(f"✅ Model loaded with {len(FEATURE_NAMES)} features")
@@ -128,6 +142,17 @@ class HealthResponse(BaseModel):
     model_loaded: bool
     model_name: str
     features_count: int
+
+
+class RAGQueryRequest(BaseModel):
+    query: str = Field(..., description="The clinical query to search the knowledge base.")
+    hf_token: Optional[str] = Field(None, description="Optional Hugging Face Hub API token.")
+
+
+class DocumentUploadRequest(BaseModel):
+    title: str = Field(..., description="Document title or medical guideline section name.")
+    content: str = Field(..., description="Raw text content of the document.")
+    category: Optional[str] = Field("guidelines", description="Category classification.")
 
 
 # ── Helper ─────────────────────────────────────────────────
@@ -412,6 +437,31 @@ def generate_report_async(patient: PatientInput, patient_id: str = "Unknown", cu
         "task_id": task.id,
         "message": "Report generation is running in the background."
     }
+
+
+@app.post("/rag/query", tags=["RAG Copilot"])
+def query_clinical_assistant(request: RAGQueryRequest, current_user: User = Depends(get_current_user)):
+    """Search clinical guidelines and return context-aware LLM generation with citations."""
+    try:
+        result = rag_engine.query(request.query, token=request.hf_token)
+        log_audit_action(current_user.id, "RAG_QUERY", "GUIDELINES", f"Query: {request.query[:100]}")
+        return result
+    except Exception as e:
+        logger.error(f"Error in RAG query: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/rag/upload", tags=["RAG Copilot"])
+def upload_guidelines(doc: DocumentUploadRequest, current_user: User = Depends(get_current_user)):
+    """Upload new medical literature text to index into the vector store."""
+    try:
+        rag_engine.add_document(doc.title, doc.content, doc.category)
+        log_audit_action(current_user.id, "RAG_UPLOAD", doc.title, "Uploaded custom text")
+        return {"status": "success", "message": f"Document '{doc.title}' successfully indexed."}
+    except Exception as e:
+        logger.error(f"Error in document upload: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn

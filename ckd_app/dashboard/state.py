@@ -630,6 +630,11 @@ def setup_sidebar(page_name="Home"):
                 "page": "pages/3_🏥_Clinical_Tools.py",
                 "tab_key": "active_tab_clinical_tools",
                 "tab_val": "📚 Patient History"
+            },
+            "Clinical Copilot - Clinical AI Assistant": {
+                "page": "pages/4_💬_Clinical_Copilot.py",
+                "tab_key": None,
+                "tab_val": None
             }
         }
         
